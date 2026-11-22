@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "grid": {
+    "divisions_x": 8,
+    "divisions_y": 8,
+    "warp_width": 800,
+    "warp_height": 800,
+    "corners_norm": null
+  },
+  "segmentation": {
+    "h_min": 14,
+    "h_max": 48,
+    "s_min": 75,
+    "v_min": 75,
+    "yellow_dominance_min": 65,
+    "weak_h_padding": 6,
+    "weak_s_min": 28,
+    "weak_v_min": 90,
+    "weak_yellow_dominance_min": 24,
+    "reconstruction_iterations": 24,
+    "weak_close_kernel": 5,
+    "min_component_area": 4,
+    "artifact_masks_norm": [
+      [0.465, 0.0, 0.535, 0.075]
+    ]
+  },
+  "measurement": {
+    "low_percentile": 0.35,
+    "high_percentile": 99.65,
+    "axis_band_norm": 0.08,
+    "min_trace_pixels": 50,
+    "symmetry_dilate_px": 2
+  },
+  "temporal": {
+    "geometry_accumulation_frames": 3,
+    "history_seconds": 6.0,
+    "stable_window_seconds": 0.5,
+    "stable_span_range_div": 0.15,
+    "stable_center_range_div": 0.15,
+    "stable_motion_max": 0.12
+  }
+}

@@ -1,0 +1,2003 @@
+import time
+import os
+import math
+import gc
+
+from media.sensor import *
+from media.display import *
+from media.media import *
+
+
+# ============================================================
+#       K230 李萨如图形：测频 + 测相位融合状态机
+# ============================================================
+#
+# 工作流程：
+#
+#   MODE_FREQUENCY
+#       ↓
+#   第一步：稳定识别“半区域结果 = 1”
+#       ↓
+#   保存第一次1倍图像的碰点位置和黄色边界特征
+#       ↓
+#   等待用户把真实倍率从1调到2
+#       ↓
+#   因为只识别左右半区域，真实2倍在本算法中仍显示为1
+#       ↓
+#   程序必须先检测到图像已经发生明显变化
+#       ↓
+#   再次稳定识别“半区域结果 = 1”
+#       ↓
+#   并且第二次图像特征必须不同于第一次
+#       ↓
+#   才允许进入 MODE_PHASE 测相位
+#
+# 保护机制：
+#
+# 1. 第一次稳定1倍后，不会立刻进入第二次确认；
+# 2. 必须先看到碰点位置、黄色边界、左右状态或黄色像素量发生变化；
+# 3. 第二次虽然数值仍是1，但图像特征必须与第一次不同；
+# 4. 如果用户没有真正调节倍率，原图保持不变，程序不会进入相位；
+# 5. 测频黄色碰点底层逻辑不修改；
+# 6. 摄像头和显示只初始化一次；
+# 7. 进入相位模式后默认不会自动返回测频模式。
+# ============================================================
+
+
+# ============================================================
+#                     共用摄像头参数
+# ============================================================
+
+IMAGE_WIDTH = 640
+IMAGE_HEIGHT = 480
+
+# False：只在CanMV IDE显示
+# True ：LCD和CanMV IDE同时显示
+USE_LCD = False
+
+sensor = None
+
+
+# ============================================================
+#                       状态机参数
+# ============================================================
+
+MODE_FREQUENCY = 0
+MODE_PHASE = 1
+
+system_mode = MODE_FREQUENCY
+
+
+# ============================================================
+#                 半区域测频的三级保护验证状态
+# ============================================================
+
+# 第一级：确认原始状态，半区域测得1
+FREQ_VERIFY_STAGE_FIRST_ONE = 0
+
+# 第二级：等待用户把真实倍率调到2，并检测图像已经变化
+FREQ_VERIFY_STAGE_WAIT_CHANGE = 1
+
+# 第三级：真实2倍时，半区域结果仍为1，重新稳定确认
+FREQ_VERIFY_STAGE_SECOND_ONE = 2
+
+frequency_verify_stage = FREQ_VERIFY_STAGE_FIRST_ONE
+
+# 因为只识别一半区域：
+#
+# 真实1倍  -> 测量结果1
+# 真实2倍  -> 测量结果仍可能为1
+#
+# 所以第一次和第二次的目标读数都设为1。
+FIRST_VERIFY_MEASURED_MULTIPLE = 1
+SECOND_VERIFY_MEASURED_MULTIPLE = 1
+
+# frequency_step()本身已经要求稳定若干帧。
+# 这里再保持若干帧，作为额外保护。
+FIRST_VERIFY_HOLD_FRAMES = 2
+SECOND_VERIFY_HOLD_FRAMES = 2
+
+# 从第一次图像切换到第二次图像时，
+# 连续多少帧检测到“发生变化”，才认为用户确实调节过倍率。
+CHANGE_REQUIRED_FRAMES = 4
+
+# 第一次确认完成后，至少等待多少帧再开始判断变化，
+# 避免状态切换瞬间造成误判。
+CHANGE_GUARD_FRAMES = 3
+
+# 图像变化判断阈值
+VERIFY_POINT_CHANGE_PIXELS = 18
+VERIFY_BOUND_CHANGE_PIXELS = 18
+
+# 黄色采样像素相对变化超过该比例，也认为图像发生变化。
+# 例如0.20表示变化20%。
+VERIFY_YELLOW_CHANGE_RATIO = 0.20
+
+first_verify_counter = 0
+change_guard_counter = 0
+change_detect_counter = 0
+second_verify_counter = 0
+
+# 保存第一次稳定1倍图像的特征
+first_frequency_signature = None
+
+
+# ============================================================
+#                    测频算法（原逻辑）
+# ============================================================
+
+freq_LEFT_ROI = (103, 11, 68, 226)
+freq_RIGHT_ROI = (509, 11, 68, 226)
+freq_DRAW_DEBUG = True
+freq_YELLOW_THRESHOLD = (40, 100, -45, 25, 15, 100)
+freq_SAMPLE_STEP = 2
+freq_MIN_YELLOW_POINTS = 25
+freq_BOUND_TRIM_FRACTION = 0.005
+freq_GRID_COLS = 10
+freq_GRID_ROWS = 8
+freq_FULL_GRID_WIDTH_PIXELS = 520
+freq_FULL_GRID_HEIGHT_PIXELS = 320
+freq_EDGE_BAND_GRID = 0.22
+freq_CLUSTER_MERGE_GAP_GRID = 0.18
+freq_MIN_CLUSTER_PIXELS = 7
+freq_MIN_CLUSTER_SPAN_PIXELS = 2
+freq_MAX_X_MULTIPLE = 10
+freq_STABLE_REQUIRED_FRAMES = 8
+freq_POINT_POSITION_TOLERANCE = 15
+freq_BOUND_POSITION_TOLERANCE = 15
+freq_MAX_LOST_FRAMES = 5
+freq_REFERENCE_FREQUENCY_HZ = 1000
+freq_SHOW_ESTIMATED_FREQUENCY = True
+freq_previous_multiple = 0
+freq_previous_left_centers = None
+freq_previous_right_centers = None
+freq_previous_left_y_min = None
+freq_previous_left_y_max = None
+freq_previous_right_y_min = None
+freq_previous_right_y_max = None
+freq_stable_frames = 0
+freq_lost_frames = 0
+
+def freq_pixel_is_white(pixel):
+    """
+    兼容二值图像的像素格式。
+    """
+    if isinstance(pixel, tuple):
+        return pixel[0] + pixel[1] + pixel[2] > 300
+    return pixel != 0
+
+def freq_roi_is_valid(roi):
+    x = roi[0]
+    y = roi[1]
+    w = roi[2]
+    h = roi[3]
+    if x < 0 or y < 0:
+        return False
+    if w <= 0 or h <= 0:
+        return False
+    if x + w > IMAGE_WIDTH:
+        return False
+    if y + h > IMAGE_HEIGHT:
+        return False
+    return True
+
+def freq_histogram_total(histogram):
+    total = 0
+    for value in histogram:
+        total += value
+    return total
+
+def freq_histogram_trimmed_bounds(histogram, trim_fraction):
+    """
+    保留原来的直方图边界计算逻辑。
+    """
+    total = freq_histogram_total(histogram)
+    if total <= 0:
+        return None
+    trim_count = int(total * trim_fraction)
+    accumulated = 0
+    low = 0
+    for index in range(len(histogram)):
+        accumulated += histogram[index]
+        if accumulated > trim_count:
+            low = index
+            break
+    accumulated = 0
+    high = len(histogram) - 1
+    for index in range(len(histogram) - 1, -1, -1):
+        accumulated += histogram[index]
+        if accumulated > trim_count:
+            high = index
+            break
+    if high <= low:
+        return None
+    return (low, high)
+
+def freq_reset_history():
+    global freq_previous_multiple
+    global freq_previous_left_centers
+    global freq_previous_right_centers
+    global freq_previous_left_y_min
+    global freq_previous_left_y_max
+    global freq_previous_right_y_min
+    global freq_previous_right_y_max
+    global freq_stable_frames
+    freq_previous_multiple = 0
+    freq_previous_left_centers = None
+    freq_previous_right_centers = None
+    freq_previous_left_y_min = None
+    freq_previous_left_y_max = None
+    freq_previous_right_y_min = None
+    freq_previous_right_y_max = None
+    freq_stable_frames = 0
+
+def freq_make_yellow_mask(img, roi):
+    """
+    只复制指定ROI，并使用原LAB阈值二值化。
+    """
+    if not freq_roi_is_valid(roi):
+        print('ROI out of image:', roi)
+        return None
+    try:
+        mask = img.copy(roi=roi)
+        mask.binary([freq_YELLOW_THRESHOLD])
+        return mask
+    except Exception as e:
+        print('make_yellow_mask error:', e)
+        return None
+
+def freq_get_curve_bounds(mask, roi_width, roi_height):
+    """
+    完全保留之前的黄色边界判断方式：
+
+    1. 对黄色像素生成X方向和Y方向直方图；
+    2. 裁掉少量离群点；
+    3. 得到黄色轨迹在ROI内的实际边界。
+
+    返回：
+        (x_min, x_max, y_min, y_max, yellow_points)
+    """
+    hist_x = [0] * roi_width
+    hist_y = [0] * roi_height
+    yellow_points = 0
+    for py in range(0, roi_height, freq_SAMPLE_STEP):
+        for px in range(0, roi_width, freq_SAMPLE_STEP):
+            pixel = mask.get_pixel(px, py)
+            if freq_pixel_is_white(pixel):
+                hist_x[px] += 1
+                hist_y[py] += 1
+                yellow_points += 1
+    if yellow_points < freq_MIN_YELLOW_POINTS:
+        return None
+    x_bounds = freq_histogram_trimmed_bounds(hist_x, freq_BOUND_TRIM_FRACTION)
+    y_bounds = freq_histogram_trimmed_bounds(hist_y, freq_BOUND_TRIM_FRACTION)
+    if x_bounds is None or y_bounds is None:
+        return None
+    return (x_bounds[0], x_bounds[1], y_bounds[0], y_bounds[1], yellow_points)
+
+def freq_extract_clusters(histogram, merge_gap_pixels, min_cluster_pixels, min_cluster_span):
+    """
+    保留之前的一维聚类判断。
+
+    每一组连续或相邻的黄色位置对应一个碰点。
+
+    返回：
+        [
+            (
+                center,
+                start,
+                end,
+                pixel_sum
+            ),
+            ...
+        ]
+    """
+    active_positions = []
+    for index in range(len(histogram)):
+        if histogram[index] > 0:
+            active_positions.append(index)
+    if len(active_positions) == 0:
+        return []
+    raw_clusters = []
+    start = active_positions[0]
+    previous = active_positions[0]
+    for index in range(1, len(active_positions)):
+        current = active_positions[index]
+        if current - previous <= merge_gap_pixels:
+            previous = current
+        else:
+            raw_clusters.append((start, previous))
+            start = current
+            previous = current
+    raw_clusters.append((start, previous))
+    clusters = []
+    for cluster in raw_clusters:
+        start = cluster[0]
+        end = cluster[1]
+        pixel_sum = 0
+        weighted_sum = 0
+        for index in range(start, end + 1):
+            count = histogram[index]
+            pixel_sum += count
+            weighted_sum += index * count
+        span = end - start + 1
+        if pixel_sum < min_cluster_pixels:
+            continue
+        if span < min_cluster_span:
+            continue
+        if pixel_sum > 0:
+            center = float(weighted_sum) / float(pixel_sum)
+        else:
+            center = (start + end) * 0.5
+        clusters.append((center, start, end, pixel_sum))
+    return clusters
+
+def freq_count_contacts_in_roi(mask, bounds, roi_width, roi_height, side_name):
+    """
+    使用原来的“黄色实际边界 + 边缘带 + Y投影聚类”逻辑。
+
+    LEFT：
+        只统计黄色轨迹实际左边界附近的黄色像素。
+
+    RIGHT：
+        只统计黄色轨迹实际右边界附近的黄色像素。
+    """
+    x_min = bounds[0]
+    x_max = bounds[1]
+    y_min = bounds[2]
+    y_max = bounds[3]
+    cell_w = float(freq_FULL_GRID_WIDTH_PIXELS) / float(freq_GRID_COLS)
+    cell_h = float(freq_FULL_GRID_HEIGHT_PIXELS) / float(freq_GRID_ROWS)
+    edge_band_x = max(freq_SAMPLE_STEP * 2, int(cell_w * freq_EDGE_BAND_GRID))
+    merge_gap_y = max(freq_SAMPLE_STEP + 1, int(cell_h * freq_CLUSTER_MERGE_GAP_GRID))
+    edge_histogram = [0] * roi_height
+    if side_name == 'LEFT':
+        edge_x = x_min
+        band_start = x_min
+        band_end = min(roi_width - 1, x_min + edge_band_x)
+    else:
+        edge_x = x_max
+        band_start = max(0, x_max - edge_band_x)
+        band_end = x_max
+    for py in range(y_min, y_max + 1, freq_SAMPLE_STEP):
+        for px in range(band_start, band_end + 1, freq_SAMPLE_STEP):
+            pixel = mask.get_pixel(px, py)
+            if freq_pixel_is_white(pixel):
+                edge_histogram[py] += 1
+    clusters = freq_extract_clusters(edge_histogram, merge_gap_y, freq_MIN_CLUSTER_PIXELS, freq_MIN_CLUSTER_SPAN_PIXELS)
+    debug_band = (band_start, band_end, y_min, y_max, edge_x)
+    return (clusters, debug_band)
+
+def freq_process_edge_roi(img, roi, side_name):
+    """
+    对一个ROI完成：
+        二值化 → 实际边界 → 边缘碰点聚类
+    """
+    mask = freq_make_yellow_mask(img, roi)
+    if mask is None:
+        return {'valid': False, 'bounds': None, 'clusters': [], 'centers': [], 'debug_band': None, 'yellow_points': 0}
+    roi_w = roi[2]
+    roi_h = roi[3]
+    bounds = freq_get_curve_bounds(mask, roi_w, roi_h)
+    if bounds is None:
+        mask = None
+        return {'valid': False, 'bounds': None, 'clusters': [], 'centers': [], 'debug_band': None, 'yellow_points': 0}
+    contacts = freq_count_contacts_in_roi(mask, bounds, roi_w, roi_h, side_name)
+    clusters = contacts[0]
+    debug_band = contacts[1]
+    centers = []
+    for cluster in clusters:
+        centers.append(cluster[0])
+    valid = len(clusters) >= 1 and len(clusters) <= freq_MAX_X_MULTIPLE
+    result = {'valid': valid, 'bounds': bounds, 'clusters': clusters, 'centers': centers, 'debug_band': debug_band, 'yellow_points': bounds[4]}
+    mask = None
+    return result
+
+def freq_center_lists_close(current_centers, previous_centers):
+    if previous_centers is None:
+        return False
+    if len(current_centers) != len(previous_centers):
+        return False
+    for index in range(len(current_centers)):
+        if abs(current_centers[index] - previous_centers[index]) > freq_POINT_POSITION_TOLERANCE:
+            return False
+    return True
+
+def freq_optional_center_lists_close(current_centers, previous_centers):
+    """
+    支持单侧无碰点的稳定判断。
+
+    当前侧和上一帧该侧都没有碰点时，认为这一侧状态稳定。
+    """
+    if len(current_centers) == 0:
+        return previous_centers is not None and len(previous_centers) == 0
+    return freq_center_lists_close(current_centers, previous_centers)
+
+def freq_bounds_are_close(current_bounds, previous_y_min, previous_y_max):
+    if current_bounds is None or previous_y_min is None or previous_y_max is None:
+        return False
+    current_y_min = current_bounds[2]
+    current_y_max = current_bounds[3]
+    if abs(current_y_min - previous_y_min) > freq_BOUND_POSITION_TOLERANCE:
+        return False
+    if abs(current_y_max - previous_y_max) > freq_BOUND_POSITION_TOLERANCE:
+        return False
+    return True
+
+def freq_optional_bounds_are_close(current_bounds, previous_y_min, previous_y_max):
+    """
+    支持单侧完全没有黄色边界的稳定判断。
+
+    当前帧和上一帧都没有该侧边界时，认为该侧状态稳定。
+    """
+    if current_bounds is None:
+        return previous_y_min is None and previous_y_max is None
+    return freq_bounds_are_close(current_bounds, previous_y_min, previous_y_max)
+
+def freq_update_stability(multiple, left_result, right_result):
+    global freq_previous_multiple
+    global freq_previous_left_centers
+    global freq_previous_right_centers
+    global freq_previous_left_y_min
+    global freq_previous_left_y_max
+    global freq_previous_right_y_min
+    global freq_previous_right_y_max
+    global freq_stable_frames
+    same_multiple = multiple == freq_previous_multiple
+    left_points_stable = freq_optional_center_lists_close(left_result['centers'], freq_previous_left_centers)
+    right_points_stable = freq_optional_center_lists_close(right_result['centers'], freq_previous_right_centers)
+    left_bounds_stable = freq_optional_bounds_are_close(left_result['bounds'], freq_previous_left_y_min, freq_previous_left_y_max)
+    right_bounds_stable = freq_optional_bounds_are_close(right_result['bounds'], freq_previous_right_y_min, freq_previous_right_y_max)
+    if same_multiple and left_points_stable and right_points_stable and left_bounds_stable and right_bounds_stable:
+        freq_stable_frames += 1
+    else:
+        freq_stable_frames = 1
+    freq_previous_multiple = multiple
+    freq_previous_left_centers = list(left_result['centers'])
+    freq_previous_right_centers = list(right_result['centers'])
+    if left_result['bounds'] is None:
+        freq_previous_left_y_min = None
+        freq_previous_left_y_max = None
+    else:
+        freq_previous_left_y_min = left_result['bounds'][2]
+        freq_previous_left_y_max = left_result['bounds'][3]
+    if right_result['bounds'] is None:
+        freq_previous_right_y_min = None
+        freq_previous_right_y_max = None
+    else:
+        freq_previous_right_y_min = right_result['bounds'][2]
+        freq_previous_right_y_max = right_result['bounds'][3]
+    return freq_stable_frames
+
+def freq_draw_roi_debug(img, roi, result, side_name, roi_color, point_color):
+    """
+    绘制：
+    1. ROI外框；
+    2. 黄色轨迹在ROI内的实际外接框；
+    3. 原边缘检测带；
+    4. 原碰点聚类结果。
+    """
+    img.draw_rectangle(roi, color=roi_color, thickness=2)
+    if not freq_DRAW_DEBUG or result['bounds'] is None:
+        return
+    bounds = result['bounds']
+    x_min = bounds[0]
+    x_max = bounds[1]
+    y_min = bounds[2]
+    y_max = bounds[3]
+    img.draw_rectangle((roi[0] + x_min, roi[1] + y_min, max(1, x_max - x_min), max(1, y_max - y_min)), color=(255, 0, 255), thickness=1)
+    debug_band = result['debug_band']
+    if debug_band is not None:
+        band_start = debug_band[0]
+        band_end = debug_band[1]
+        band_y_min = debug_band[2]
+        band_y_max = debug_band[3]
+        edge_x = debug_band[4]
+        img.draw_rectangle((roi[0] + band_start, roi[1] + band_y_min, max(1, band_end - band_start), max(1, band_y_max - band_y_min)), color=(0, 180, 255), thickness=1)
+        point_x = roi[0] + edge_x
+        for cluster in result['clusters']:
+            point_y = int(roi[1] + cluster[0])
+            img.draw_circle(point_x, point_y, 7, color=point_color, thickness=3)
+
+def freq_draw_nofind(img, left_count, right_count, reason):
+    img.draw_string(10, 10, 'NOFIND', color=(255, 0, 0), scale=3)
+    img.draw_string(10, 50, 'L:%d R:%d' % (left_count, right_count), color=(255, 255, 0), scale=2)
+    img.draw_string(10, 80, reason, color=(255, 255, 0), scale=2)
+
+def freq_draw_checking(img, multiple, current_stable_frames):
+    img.draw_string(10, 10, 'CHECKING', color=(255, 255, 0), scale=3)
+    img.draw_string(10, 50, 'X MULTIPLE:%d' % multiple, color=(255, 255, 0), scale=2)
+    img.draw_string(10, 80, 'STABLE:%d/%d' % (current_stable_frames, freq_STABLE_REQUIRED_FRAMES), color=(255, 255, 0), scale=2)
+
+def freq_draw_locked(img, multiple):
+    img.draw_string(10, 10, 'MULTIPLE IMAGE', color=(0, 255, 0), scale=2)
+    img.draw_string(10, 40, 'X MULTIPLE:%d' % multiple, color=(0, 255, 0), scale=3)
+    if freq_SHOW_ESTIMATED_FREQUENCY:
+        estimated_frequency = freq_REFERENCE_FREQUENCY_HZ * multiple
+        img.draw_string(10, 82, 'X FREQ:%dHZ' % estimated_frequency, color=(0, 255, 0), scale=2)
+
+# ============================================================
+#                    测相位算法（原逻辑）
+# ============================================================
+
+phase_GRID_RECT = (89, 18, 456, 431)
+phase_GRID_COLS = 10
+phase_GRID_ROWS = 8
+phase_DRAW_GRID_HELPER = False
+phase_YELLOW_THRESHOLD = (40, 100, -45, 25, 15, 100)
+phase_SAMPLE_STEP = 2
+phase_MIN_YELLOW_POINTS = 120
+phase_TRIM_FRACTION = 0.02
+phase_ELLIPSE_RHO_MIN = 0.45
+phase_ELLIPSE_RHO_MAX = 1.65
+phase_PHASE_SMOOTH_ALPHA = 0.2
+phase_MAX_LOST_FRAMES = 8
+phase_RATIO_CORRECTION = 1.0
+phase_CIRCLE_RATIO = 0.93
+phase_LINE_RATIO = 0.025
+phase_REVERSE_PHASE_BRANCH = False
+phase_smooth_phase = None
+phase_lost_frames = 0
+phase_last_axis_ux = 0.70710678
+phase_last_axis_uy = 0.70710678
+
+def phase_clamp(value, low, high):
+    if value < low:
+        return low
+    if value > high:
+        return high
+    return value
+
+def phase_pixel_is_white(pixel):
+    """
+    兼容二值图或RGB565二值结果。
+    """
+    if isinstance(pixel, tuple):
+        return pixel[0] + pixel[1] + pixel[2] > 300
+    return pixel != 0
+
+def phase_grid_to_pixel(gx, gy):
+    """
+    网格坐标转换成摄像头像素坐标。
+
+    网格坐标原点位于示波器网格左下角。
+    """
+    grid_x = phase_GRID_RECT[0]
+    grid_y = phase_GRID_RECT[1]
+    grid_w = phase_GRID_RECT[2]
+    grid_h = phase_GRID_RECT[3]
+    cell_w = float(grid_w) / phase_GRID_COLS
+    cell_h = float(grid_h) / phase_GRID_ROWS
+    px = int(grid_x + gx * cell_w + 0.5)
+    py = int(grid_y + grid_h - gy * cell_h + 0.5)
+    px = int(phase_clamp(px, 0, IMAGE_WIDTH - 1))
+    py = int(phase_clamp(py, 0, IMAGE_HEIGHT - 1))
+    return (px, py)
+
+def phase_collect_yellow_points(img):
+    """
+    提取黄色李萨如轨迹。
+
+    将像素坐标转换成以“格”为单位的坐标，
+    消除横格、纵格像素大小不一致造成的误差。
+    """
+    grid_w = phase_GRID_RECT[2]
+    grid_h = phase_GRID_RECT[3]
+    cell_w = float(grid_w) / phase_GRID_COLS
+    cell_h = float(grid_h) / phase_GRID_ROWS
+    points = []
+    mask = None
+    try:
+        mask = img.copy(roi=phase_GRID_RECT)
+        mask.binary([phase_YELLOW_THRESHOLD])
+        for py in range(0, grid_h, phase_SAMPLE_STEP):
+            for px in range(0, grid_w, phase_SAMPLE_STEP):
+                pixel = mask.get_pixel(px, py)
+                if phase_pixel_is_white(pixel):
+                    gx = float(px) / cell_w
+                    gy = float(grid_h - 1 - py) / cell_h
+                    points.append((gx, gy))
+    except Exception as e:
+        print('yellow mask error:', e)
+        points = []
+    mask = None
+    return points
+
+def phase_principal_axes(points):
+    """
+    根据黄色点云计算长轴和短轴方向。
+
+    使用点云二阶矩和主成分方向。
+    """
+    count = len(points)
+    if count < 3:
+        return None
+    sum_x = 0.0
+    sum_y = 0.0
+    for point in points:
+        sum_x += point[0]
+        sum_y += point[1]
+    center_x = sum_x / count
+    center_y = sum_y / count
+    sxx = 0.0
+    syy = 0.0
+    sxy = 0.0
+    for point in points:
+        dx = point[0] - center_x
+        dy = point[1] - center_y
+        sxx += dx * dx
+        syy += dy * dy
+        sxy += dx * dy
+    sxx /= count
+    syy /= count
+    sxy /= count
+    if sxx + syy < 1e-06:
+        return None
+    theta = 0.5 * math.atan2(2.0 * sxy, sxx - syy)
+    ux = math.cos(theta)
+    uy = math.sin(theta)
+    vx = -uy
+    vy = ux
+    var_u = ux * ux * sxx + 2.0 * ux * uy * sxy + uy * uy * syy
+    var_v = vx * vx * sxx + 2.0 * vx * vy * sxy + vy * vy * syy
+    if var_v > var_u:
+        ux = vx
+        uy = vy
+    if ux < 0:
+        ux = -ux
+        uy = -uy
+    vx = -uy
+    vy = ux
+    return (center_x, center_y, ux, uy, vx, vy)
+
+def phase_trimmed_bounds(values):
+    """
+    对数值排序并裁掉两端少量离群值。
+    """
+    count = len(values)
+    if count == 0:
+        return None
+    values.sort()
+    trim_count = int(count * phase_TRIM_FRACTION)
+    if trim_count * 2 >= count - 2:
+        trim_count = 0
+    low = values[trim_count]
+    high = values[count - 1 - trim_count]
+    return (low, high)
+
+def phase_projection_bounds(points, center_x, center_y, ux, uy, vx, vy):
+    """
+    将所有黄色点分别投影到长轴和短轴方向。
+    """
+    major_values = []
+    minor_values = []
+    for point in points:
+        dx = point[0] - center_x
+        dy = point[1] - center_y
+        major_value = dx * ux + dy * uy
+        minor_value = dx * vx + dy * vy
+        major_values.append(major_value)
+        minor_values.append(minor_value)
+    major_bounds = phase_trimmed_bounds(major_values)
+    minor_bounds = phase_trimmed_bounds(minor_values)
+    if major_bounds is None or minor_bounds is None:
+        return None
+    return (major_bounds[0], major_bounds[1], minor_bounds[0], minor_bounds[1])
+
+def phase_fit_axes_once(points):
+    """
+    拟合一次长轴、短轴和中心。
+    """
+    axes = phase_principal_axes(points)
+    if axes is None:
+        return None
+    center_x = axes[0]
+    center_y = axes[1]
+    ux = axes[2]
+    uy = axes[3]
+    vx = axes[4]
+    vy = axes[5]
+    bounds = phase_projection_bounds(points, center_x, center_y, ux, uy, vx, vy)
+    if bounds is None:
+        return None
+    major_low = bounds[0]
+    major_high = bounds[1]
+    minor_low = bounds[2]
+    minor_high = bounds[3]
+    major_length = major_high - major_low
+    minor_length = minor_high - minor_low
+    if minor_length > major_length:
+        ux = vx
+        uy = vy
+        if ux < 0:
+            ux = -ux
+            uy = -uy
+        vx = -uy
+        vy = ux
+        bounds = phase_projection_bounds(points, center_x, center_y, ux, uy, vx, vy)
+        if bounds is None:
+            return None
+        major_low = bounds[0]
+        major_high = bounds[1]
+        minor_low = bounds[2]
+        minor_high = bounds[3]
+        major_length = major_high - major_low
+        minor_length = minor_high - minor_low
+    if major_length <= 0.001 or minor_length < 0:
+        return None
+    major_mid = 0.5 * (major_low + major_high)
+    minor_mid = 0.5 * (minor_low + minor_high)
+    center_x = center_x + major_mid * ux + minor_mid * vx
+    center_y = center_y + major_mid * uy + minor_mid * vy
+    return (center_x, center_y, ux, uy, vx, vy, major_length, minor_length)
+
+def phase_refine_points(points, fit_result):
+    """
+    根据第一次椭圆拟合结果，
+    排除椭圆内部的黄色光标和孤立噪点。
+    """
+    center_x = fit_result[0]
+    center_y = fit_result[1]
+    ux = fit_result[2]
+    uy = fit_result[3]
+    vx = fit_result[4]
+    vy = fit_result[5]
+    major_length = fit_result[6]
+    minor_length = fit_result[7]
+    major_radius = major_length * 0.5
+    minor_radius = minor_length * 0.5
+    if major_radius < 0.001 or minor_radius < 0.001:
+        return points
+    refined = []
+    for point in points:
+        dx = point[0] - center_x
+        dy = point[1] - center_y
+        major_value = (dx * ux + dy * uy) / major_radius
+        minor_value = (dx * vx + dy * vy) / minor_radius
+        rho = major_value * major_value + minor_value * minor_value
+        if phase_ELLIPSE_RHO_MIN <= rho <= phase_ELLIPSE_RHO_MAX:
+            refined.append(point)
+    return refined
+
+def phase_fit_lissajous(points):
+    """
+    第一次粗拟合，排除离群点后再拟合一次。
+    """
+    first_fit = phase_fit_axes_once(points)
+    if first_fit is None:
+        return None
+    refined = phase_refine_points(points, first_fit)
+    minimum_refined = max(60, int(len(points) * 0.35))
+    if len(refined) >= minimum_refined:
+        second_fit = phase_fit_axes_once(refined)
+        if second_fit is not None:
+            return (second_fit, len(refined))
+    return (first_fit, len(points))
+
+def phase_calculate_phase(major_length, minor_length, ux, uy):
+    """
+    等频、等幅李萨如图形：
+
+    ratio = 短轴 / 长轴
+    folded_phase = 2 * atan(ratio)
+
+    长轴正斜率：
+        0～90度
+
+    长轴负斜率：
+        90～180度
+    """
+    global phase_last_axis_ux
+    global phase_last_axis_uy
+    if major_length <= 0.001:
+        return None
+    ratio_raw = phase_clamp(minor_length / major_length, 0.0, 1.0)
+    ratio = phase_clamp(ratio_raw * phase_RATIO_CORRECTION, 0.0, 1.0)
+    if ratio >= phase_CIRCLE_RATIO:
+        return (90.0, ratio_raw, ratio, 'CIRCLE', phase_last_axis_ux, phase_last_axis_uy)
+    phase_last_axis_ux = ux
+    phase_last_axis_uy = uy
+    folded_phase = 2.0 * math.atan(ratio) * 180.0 / math.pi
+    positive_slope = uy >= 0.0
+    if phase_REVERSE_PHASE_BRANCH:
+        positive_slope = not positive_slope
+    if ratio <= phase_LINE_RATIO:
+        if positive_slope:
+            return (0.0, ratio_raw, ratio, 'LINE-0', ux, uy)
+        return (180.0, ratio_raw, ratio, 'LINE-180', ux, uy)
+    if positive_slope:
+        return (folded_phase, ratio_raw, ratio, '0-90', ux, uy)
+    return (180.0 - folded_phase, ratio_raw, ratio, '90-180', ux, uy)
+
+def phase_smooth_phase_value(value):
+    global phase_smooth_phase
+    if phase_smooth_phase is None:
+        phase_smooth_phase = float(value)
+    else:
+        phase_smooth_phase = phase_smooth_phase * (1.0 - phase_PHASE_SMOOTH_ALPHA) + value * phase_PHASE_SMOOTH_ALPHA
+    return phase_smooth_phase
+
+def phase_draw_grid(img):
+    """
+    绘制网格标定框。
+    """
+    img.draw_rectangle(phase_GRID_RECT, color=(0, 255, 255), thickness=2)
+    if not phase_DRAW_GRID_HELPER:
+        return
+    grid_x = phase_GRID_RECT[0]
+    grid_y = phase_GRID_RECT[1]
+    grid_w = phase_GRID_RECT[2]
+    grid_h = phase_GRID_RECT[3]
+    cell_w = float(grid_w) / phase_GRID_COLS
+    cell_h = float(grid_h) / phase_GRID_ROWS
+    for index in range(1, phase_GRID_COLS):
+        x = int(grid_x + index * cell_w)
+        img.draw_line((x, grid_y, x, grid_y + grid_h), color=(70, 70, 70), thickness=1)
+    for index in range(1, phase_GRID_ROWS):
+        y = int(grid_y + index * cell_h)
+        img.draw_line((grid_x, y, grid_x + grid_w, y), color=(70, 70, 70), thickness=1)
+
+def phase_draw_result(img, fit_result, point_count):
+    center_x = fit_result[0]
+    center_y = fit_result[1]
+    ux = fit_result[2]
+    uy = fit_result[3]
+    major_length = fit_result[6]
+    minor_length = fit_result[7]
+    phase_result = phase_calculate_phase(major_length, minor_length, ux, uy)
+    if phase_result is None:
+        return False
+    phase_raw = phase_result[0]
+    ratio_raw = phase_result[1]
+    ratio_corrected = phase_result[2]
+    state = phase_result[3]
+    draw_ux = phase_result[4]
+    draw_uy = phase_result[5]
+    draw_vx = -draw_uy
+    draw_vy = draw_ux
+    phase = phase_smooth_phase_value(phase_raw)
+    major_radius = major_length * 0.5
+    minor_radius = minor_length * 0.5
+    major_point1 = phase_grid_to_pixel(center_x - draw_ux * major_radius, center_y - draw_uy * major_radius)
+    major_point2 = phase_grid_to_pixel(center_x + draw_ux * major_radius, center_y + draw_uy * major_radius)
+    minor_point1 = phase_grid_to_pixel(center_x - draw_vx * minor_radius, center_y - draw_vy * minor_radius)
+    minor_point2 = phase_grid_to_pixel(center_x + draw_vx * minor_radius, center_y + draw_vy * minor_radius)
+    center_point = phase_grid_to_pixel(center_x, center_y)
+    img.draw_line((major_point1[0], major_point1[1], major_point2[0], major_point2[1]), color=(255, 0, 0), thickness=4)
+    img.draw_line((minor_point1[0], minor_point1[1], minor_point2[0], minor_point2[1]), color=(0, 255, 0), thickness=4)
+    img.draw_circle(minor_point1[0], minor_point1[1], 6, color=(0, 255, 0), thickness=2)
+    img.draw_circle(minor_point2[0], minor_point2[1], 6, color=(0, 255, 0), thickness=2)
+    img.draw_cross(center_point[0], center_point[1], color=(0, 255, 255), size=12, thickness=3)
+    img.draw_string(10, 10, 'PHASE: %.1f DEG' % phase, color=(255, 255, 0), scale=2)
+    img.draw_string(10, 40, 'MAJOR: %.2f GRID' % major_length, color=(255, 255, 0), scale=2)
+    img.draw_string(10, 70, 'MINOR: %.2f GRID' % minor_length, color=(255, 255, 0), scale=2)
+    img.draw_string(10, 100, 'RATIO: %.3f' % ratio_raw, color=(255, 255, 0), scale=2)
+    img.draw_string(10, 130, 'STATE: ' + state, color=(255, 255, 0), scale=2)
+    print('phase=%.2f' % phase, 'phase_raw=%.2f' % phase_raw, 'major=%.3f' % major_length, 'minor=%.3f' % minor_length, 'ratio_raw=%.4f' % ratio_raw, 'ratio_corrected=%.4f' % ratio_corrected, 'state=' + state, 'points=%d' % point_count)
+    return True
+
+# ============================================================
+#                     测频单帧处理
+# ============================================================
+
+def frequency_step(img):
+    """
+    执行一帧测频。
+
+    返回：
+        {
+            "locked": 是否已稳定锁定,
+            "multiple": 半区域算法得到的倍数,
+            "left_count": 左侧碰点数,
+            "right_count": 右侧碰点数,
+            "left_centers": 左侧碰点中心位置,
+            "right_centers": 右侧碰点中心位置,
+            "left_bounds": 左侧黄色边界,
+            "right_bounds": 右侧黄色边界,
+            "left_yellow": 左ROI黄色采样点数,
+            "right_yellow": 右ROI黄色采样点数,
+            "one_side_single": 是否属于单侧一个点
+        }
+    """
+
+    global freq_lost_frames
+
+    left_result = freq_process_edge_roi(
+        img,
+        freq_LEFT_ROI,
+        "LEFT"
+    )
+
+    right_result = freq_process_edge_roi(
+        img,
+        freq_RIGHT_ROI,
+        "RIGHT"
+    )
+
+    freq_draw_roi_debug(
+        img,
+        freq_LEFT_ROI,
+        left_result,
+        "LEFT",
+        (0, 255, 255),
+        (255, 0, 0)
+    )
+
+    freq_draw_roi_debug(
+        img,
+        freq_RIGHT_ROI,
+        right_result,
+        "RIGHT",
+        (255, 0, 255),
+        (0, 255, 0)
+    )
+
+    left_count = len(
+        left_result["clusters"]
+    )
+
+    right_count = len(
+        right_result["clusters"]
+    )
+
+    normal_multiple = (
+        left_result["valid"] and
+        right_result["valid"] and
+        left_count == right_count and
+        left_count >= 1 and
+        left_count <= freq_MAX_X_MULTIPLE
+    )
+
+    one_side_single = (
+        (
+            left_count == 1 and
+            right_count == 0 and
+            left_result["valid"]
+        )
+        or
+        (
+            left_count == 0 and
+            right_count == 1 and
+            right_result["valid"]
+        )
+    )
+
+    valid_multiple = (
+        normal_multiple or
+        one_side_single
+    )
+
+    locked = False
+    multiple = 0
+
+    if valid_multiple:
+        if one_side_single:
+            multiple = 1
+        else:
+            multiple = left_count
+
+        current_stable_frames = freq_update_stability(
+            multiple,
+            left_result,
+            right_result
+        )
+
+        freq_lost_frames = 0
+
+        if (
+            current_stable_frames >=
+            freq_STABLE_REQUIRED_FRAMES
+        ):
+            locked = True
+
+            freq_draw_locked(
+                img,
+                multiple
+            )
+
+            if one_side_single:
+                img.draw_string(
+                    10,
+                    112,
+                    "ONE SIDE SINGLE POINT",
+                    color=(0, 255, 0),
+                    scale=1
+                )
+
+            if one_side_single:
+                detect_mode = "ONE_SIDE_SINGLE"
+            else:
+                detect_mode = "BOTH_SIDES"
+
+            print(
+                "mode=FREQUENCY",
+                "pattern=MULTIPLE",
+                "detect_mode=" + detect_mode,
+                "x_multiple=%d" % multiple,
+                "left=%d" % left_count,
+                "right=%d" % right_count,
+                "stable=%d/%d" % (
+                    current_stable_frames,
+                    freq_STABLE_REQUIRED_FRAMES
+                )
+            )
+
+        else:
+            freq_draw_checking(
+                img,
+                multiple,
+                current_stable_frames
+            )
+
+            if one_side_single:
+                img.draw_string(
+                    10,
+                    112,
+                    "ONE SIDE SINGLE POINT",
+                    color=(255, 255, 0),
+                    scale=1
+                )
+
+            print(
+                "mode=FREQUENCY",
+                "pattern=CHECKING",
+                "x_multiple=%d" % multiple,
+                "left=%d" % left_count,
+                "right=%d" % right_count,
+                "stable=%d/%d" % (
+                    current_stable_frames,
+                    freq_STABLE_REQUIRED_FRAMES
+                )
+            )
+
+    else:
+        freq_lost_frames += 1
+
+        if (
+            left_count == 0 and
+            right_count == 0
+        ):
+            reason = "NO CONTACT"
+
+        elif left_count != right_count:
+            reason = "LEFT RIGHT NOT EQUAL"
+
+        elif not left_result["valid"]:
+            reason = "LEFT NO CONTACT"
+
+        elif not right_result["valid"]:
+            reason = "RIGHT NO CONTACT"
+
+        else:
+            reason = "NO VALID MULTIPLE"
+
+        freq_draw_nofind(
+            img,
+            left_count,
+            right_count,
+            reason
+        )
+
+        print(
+            "mode=FREQUENCY",
+            "pattern=NOFIND",
+            "reason=" + reason,
+            "left=%d" % left_count,
+            "right=%d" % right_count,
+            "left_yellow=%d" %
+            left_result["yellow_points"],
+            "right_yellow=%d" %
+            right_result["yellow_points"]
+        )
+
+        if (
+            freq_lost_frames >=
+            freq_MAX_LOST_FRAMES
+        ):
+            freq_reset_history()
+
+    img.draw_string(
+        10,
+        120,
+        "LY:%d RY:%d" % (
+            left_result["yellow_points"],
+            right_result["yellow_points"]
+        ),
+        color=(255, 255, 255),
+        scale=1
+    )
+
+    img.draw_string(
+        10,
+        140,
+        "MODE:FREQUENCY",
+        color=(0, 255, 255),
+        scale=1
+    )
+
+    return {
+        "locked": locked,
+        "multiple": multiple,
+        "left_count": left_count,
+        "right_count": right_count,
+        "left_centers": list(left_result["centers"]),
+        "right_centers": list(right_result["centers"]),
+        "left_bounds": left_result["bounds"],
+        "right_bounds": right_result["bounds"],
+        "left_yellow": left_result["yellow_points"],
+        "right_yellow": right_result["yellow_points"],
+        "one_side_single": one_side_single
+    }
+
+
+# ============================================================
+#                 测频图像特征签名与变化判断
+# ============================================================
+
+def copy_bounds(bounds):
+    if bounds is None:
+        return None
+
+    return (
+        bounds[0],
+        bounds[1],
+        bounds[2],
+        bounds[3],
+        bounds[4]
+    )
+
+
+def make_frequency_signature(result):
+    """
+    保存当前测频图像的关键特征。
+
+    即使两次读数都为1，只要真实图形由1倍变成2倍，
+    碰点位置、黄色边界、左右出现方式或黄色像素量通常会变化。
+    """
+
+    return {
+        "multiple": result["multiple"],
+        "left_count": result["left_count"],
+        "right_count": result["right_count"],
+        "left_centers": list(result["left_centers"]),
+        "right_centers": list(result["right_centers"]),
+        "left_bounds": copy_bounds(result["left_bounds"]),
+        "right_bounds": copy_bounds(result["right_bounds"]),
+        "left_yellow": result["left_yellow"],
+        "right_yellow": result["right_yellow"],
+        "one_side_single": result["one_side_single"]
+    }
+
+
+def max_center_difference(current, baseline):
+    """
+    比较同一侧碰点中心位置。
+
+    数量不同直接视为发生变化。
+    """
+
+    if len(current) != len(baseline):
+        return 9999.0
+
+    if len(current) == 0:
+        return 0.0
+
+    maximum = 0.0
+
+    for index in range(len(current)):
+        difference = abs(
+            current[index] -
+            baseline[index]
+        )
+
+        if difference > maximum:
+            maximum = difference
+
+    return maximum
+
+
+def bounds_difference(current, baseline):
+    """
+    比较黄色轨迹上下边界。
+
+    任意一侧从有到无或从无到有，直接视为明显变化。
+    """
+
+    if current is None and baseline is None:
+        return 0.0
+
+    if current is None or baseline is None:
+        return 9999.0
+
+    differences = (
+        abs(current[0] - baseline[0]),
+        abs(current[1] - baseline[1]),
+        abs(current[2] - baseline[2]),
+        abs(current[3] - baseline[3])
+    )
+
+    maximum = 0.0
+
+    for value in differences:
+        if value > maximum:
+            maximum = value
+
+    return maximum
+
+
+def relative_change(current, baseline):
+    """
+    计算两个非负数的相对变化。
+    """
+
+    if baseline <= 0:
+        if current <= 0:
+            return 0.0
+
+        return 1.0
+
+    return abs(
+        float(current) -
+        float(baseline)
+    ) / float(baseline)
+
+
+def frequency_signature_changed(
+    current_result,
+    baseline_signature
+):
+    """
+    判断用户是否确实把真实倍率从1调到了2。
+
+    注意：
+    由于只识别一半区域，数值仍可能是1，
+    所以不能只比较multiple，必须比较图像特征。
+    """
+
+    if baseline_signature is None:
+        return False
+
+    # 左右出现方式变化：
+    # 例如第一次是单侧一点，第二次变成左右各一点。
+    if (
+        current_result["one_side_single"] !=
+        baseline_signature["one_side_single"]
+    ):
+        return True
+
+    # 左右碰点数量变化
+    if (
+        current_result["left_count"] !=
+        baseline_signature["left_count"]
+    ):
+        return True
+
+    if (
+        current_result["right_count"] !=
+        baseline_signature["right_count"]
+    ):
+        return True
+
+    # 碰点中心位置发生明显变化
+    left_point_difference = max_center_difference(
+        current_result["left_centers"],
+        baseline_signature["left_centers"]
+    )
+
+    right_point_difference = max_center_difference(
+        current_result["right_centers"],
+        baseline_signature["right_centers"]
+    )
+
+    if (
+        left_point_difference >=
+        VERIFY_POINT_CHANGE_PIXELS
+    ):
+        return True
+
+    if (
+        right_point_difference >=
+        VERIFY_POINT_CHANGE_PIXELS
+    ):
+        return True
+
+    # 黄色轨迹实际边界发生明显变化
+    left_bound_difference = bounds_difference(
+        current_result["left_bounds"],
+        baseline_signature["left_bounds"]
+    )
+
+    right_bound_difference = bounds_difference(
+        current_result["right_bounds"],
+        baseline_signature["right_bounds"]
+    )
+
+    if (
+        left_bound_difference >=
+        VERIFY_BOUND_CHANGE_PIXELS
+    ):
+        return True
+
+    if (
+        right_bound_difference >=
+        VERIFY_BOUND_CHANGE_PIXELS
+    ):
+        return True
+
+    # 黄色像素量发生明显变化
+    left_yellow_change = relative_change(
+        current_result["left_yellow"],
+        baseline_signature["left_yellow"]
+    )
+
+    right_yellow_change = relative_change(
+        current_result["right_yellow"],
+        baseline_signature["right_yellow"]
+    )
+
+    if (
+        left_yellow_change >=
+        VERIFY_YELLOW_CHANGE_RATIO
+    ):
+        return True
+
+    if (
+        right_yellow_change >=
+        VERIFY_YELLOW_CHANGE_RATIO
+    ):
+        return True
+
+    return False
+
+
+def second_signature_is_valid(
+    current_result,
+    baseline_signature
+):
+    """
+    第二次确认必须满足：
+
+    1. 半区域测量值稳定为1；
+    2. 当前图像与第一次图像明显不同。
+    """
+
+    if not current_result["locked"]:
+        return False
+
+    if (
+        current_result["multiple"] !=
+        SECOND_VERIFY_MEASURED_MULTIPLE
+    ):
+        return False
+
+    return frequency_signature_changed(
+        current_result,
+        baseline_signature
+    )
+
+
+# ============================================================
+#                     测频状态清除
+# ============================================================
+
+def reset_frequency_detection_state():
+    """
+    清除测频算法的历史稳定数据。
+
+    在确认图像已经发生变化、准备开始第二次稳定确认时调用，
+    防止第一次1倍图像的稳定帧带入第二次验证。
+    """
+
+    global freq_lost_frames
+
+    freq_reset_history()
+    freq_lost_frames = 0
+
+
+# ============================================================
+#                     相位状态清除
+# ============================================================
+
+def reset_phase_state():
+    global phase_smooth_phase
+    global phase_lost_frames
+    global phase_last_axis_ux
+    global phase_last_axis_uy
+
+    phase_smooth_phase = None
+    phase_lost_frames = 0
+
+    phase_last_axis_ux = 0.70710678
+    phase_last_axis_uy = 0.70710678
+
+
+# ============================================================
+#                     测相位单帧处理
+# ============================================================
+
+def phase_step(img):
+    """
+    执行一帧相位测量。
+    """
+
+    global phase_lost_frames
+    global phase_smooth_phase
+
+    points = phase_collect_yellow_points(
+        img
+    )
+
+    detected = False
+
+    if (
+        len(points) >=
+        phase_MIN_YELLOW_POINTS
+    ):
+        fit_output = phase_fit_lissajous(
+            points
+        )
+
+        if fit_output is not None:
+            fit_result = fit_output[0]
+            used_points = fit_output[1]
+
+            detected = phase_draw_result(
+                img,
+                fit_result,
+                used_points
+            )
+
+    if detected:
+        phase_lost_frames = 0
+
+    else:
+        phase_lost_frames += 1
+
+        img.draw_string(
+            10,
+            10,
+            "NO LISSAJOUS CURVE",
+            color=(255, 0, 0),
+            scale=2
+        )
+
+        if (
+            phase_lost_frames >=
+            phase_MAX_LOST_FRAMES
+        ):
+            phase_smooth_phase = None
+
+    phase_draw_grid(
+        img
+    )
+
+    img.draw_string(
+        10,
+        160,
+        "MODE:PHASE",
+        color=(0, 255, 255),
+        scale=1
+    )
+
+    points = None
+
+    return detected
+
+
+# ============================================================
+#                       摄像头初始化
+# ============================================================
+
+def camera_init():
+    global sensor
+
+    sensor = Sensor(
+        width=IMAGE_WIDTH,
+        height=IMAGE_HEIGHT
+    )
+
+    sensor.reset()
+
+    sensor.set_framesize(
+        width=IMAGE_WIDTH,
+        height=IMAGE_HEIGHT
+    )
+
+    sensor.set_pixformat(
+        Sensor.RGB565
+    )
+
+    # 画面左右颠倒时取消注释
+    # sensor.set_hmirror(True)
+
+    # 画面上下颠倒时取消注释
+    # sensor.set_vflip(True)
+
+    if USE_LCD:
+        Display.init(
+            Display.ST7701,
+            width=IMAGE_WIDTH,
+            height=IMAGE_HEIGHT,
+            fps=30,
+            to_ide=True
+        )
+
+    else:
+        Display.init(
+            Display.VIRT,
+            width=IMAGE_WIDTH,
+            height=IMAGE_HEIGHT,
+            fps=30,
+            to_ide=True
+        )
+
+    MediaManager.init()
+
+    sensor.run()
+
+    time.sleep_ms(1000)
+
+
+def camera_deinit():
+    global sensor
+
+    try:
+        if isinstance(
+            sensor,
+            Sensor
+        ):
+            sensor.stop()
+
+    except Exception:
+        pass
+
+    try:
+        Display.deinit()
+
+    except Exception:
+        pass
+
+    os.exitpoint(
+        os.EXITPOINT_ENABLE_SLEEP
+    )
+
+    time.sleep_ms(100)
+
+    try:
+        MediaManager.deinit()
+
+    except Exception:
+        pass
+
+
+# ============================================================
+#                          主循环
+# ============================================================
+
+def main_loop():
+    global system_mode
+
+    global frequency_verify_stage
+
+    global first_verify_counter
+    global change_guard_counter
+    global change_detect_counter
+    global second_verify_counter
+
+    global first_frequency_signature
+
+    clock = time.clock()
+
+    while True:
+        os.exitpoint()
+
+        clock.tick()
+
+        img = sensor.snapshot()
+
+        # 在本帧显示完提示后再进行状态切换
+        enter_wait_change_stage = False
+        enter_second_verify_stage = False
+        switch_to_phase = False
+
+        # ====================================================
+        #                    测频模式
+        # ====================================================
+
+        if system_mode == MODE_FREQUENCY:
+            frequency_result = frequency_step(
+                img
+            )
+
+            locked = frequency_result["locked"]
+            multiple = frequency_result["multiple"]
+
+            # ------------------------------------------------
+            # 第一级：稳定确认第一次“半区域结果=1”
+            # ------------------------------------------------
+
+            if (
+                frequency_verify_stage ==
+                FREQ_VERIFY_STAGE_FIRST_ONE
+            ):
+                img.draw_string(
+                    10,
+                    170,
+                    "STEP1: REAL X=1",
+                    color=(0, 255, 255),
+                    scale=2
+                )
+
+                img.draw_string(
+                    10,
+                    200,
+                    "HALF ROI NEED VALUE=1",
+                    color=(0, 255, 255),
+                    scale=1
+                )
+
+                if (
+                    locked and
+                    multiple ==
+                    FIRST_VERIFY_MEASURED_MULTIPLE
+                ):
+                    first_verify_counter += 1
+
+                    img.draw_string(
+                        10,
+                        225,
+                        "FIRST 1 CONFIRM:%d/%d" % (
+                            first_verify_counter,
+                            FIRST_VERIFY_HOLD_FRAMES
+                        ),
+                        color=(0, 255, 0),
+                        scale=2
+                    )
+
+                    if (
+                        first_verify_counter >=
+                        FIRST_VERIFY_HOLD_FRAMES
+                    ):
+                        # 保存第一次稳定图像特征
+                        first_frequency_signature = (
+                            make_frequency_signature(
+                                frequency_result
+                            )
+                        )
+
+                        enter_wait_change_stage = True
+
+                        img.draw_string(
+                            10,
+                            255,
+                            "STEP1 PASS, SET REAL X=2",
+                            color=(0, 255, 0),
+                            scale=2
+                        )
+
+                else:
+                    first_verify_counter = 0
+
+                    if locked:
+                        img.draw_string(
+                            10,
+                            225,
+                            "VALUE=%d, NEED 1" %
+                            multiple,
+                            color=(255, 0, 0),
+                            scale=2
+                        )
+
+                    else:
+                        img.draw_string(
+                            10,
+                            225,
+                            "WAIT STABLE VALUE=1",
+                            color=(255, 255, 0),
+                            scale=2
+                        )
+
+            # ------------------------------------------------
+            # 第二级：等待用户真正调节，先确认图像发生变化
+            # ------------------------------------------------
+
+            elif (
+                frequency_verify_stage ==
+                FREQ_VERIFY_STAGE_WAIT_CHANGE
+            ):
+                img.draw_string(
+                    10,
+                    170,
+                    "STEP2: SET REAL X=2",
+                    color=(0, 255, 255),
+                    scale=2
+                )
+
+                img.draw_string(
+                    10,
+                    200,
+                    "DISPLAY MAY STILL BE 1",
+                    color=(255, 255, 0),
+                    scale=1
+                )
+
+                change_guard_counter += 1
+
+                if (
+                    change_guard_counter <=
+                    CHANGE_GUARD_FRAMES
+                ):
+                    change_detect_counter = 0
+
+                    img.draw_string(
+                        10,
+                        225,
+                        "CHANGE GUARD:%d/%d" % (
+                            change_guard_counter,
+                            CHANGE_GUARD_FRAMES
+                        ),
+                        color=(255, 255, 0),
+                        scale=2
+                    )
+
+                else:
+                    changed = frequency_signature_changed(
+                        frequency_result,
+                        first_frequency_signature
+                    )
+
+                    # 用户调节过程中通常会短暂NOFIND/不锁定；
+                    # 这也属于图像已经开始发生变化。
+                    if (
+                        changed or
+                        not locked
+                    ):
+                        change_detect_counter += 1
+
+                    else:
+                        change_detect_counter = 0
+
+                    img.draw_string(
+                        10,
+                        225,
+                        "CHANGE:%d/%d" % (
+                            change_detect_counter,
+                            CHANGE_REQUIRED_FRAMES
+                        ),
+                        color=(
+                            (0, 255, 0)
+                            if change_detect_counter > 0
+                            else (255, 255, 0)
+                        ),
+                        scale=2
+                    )
+
+                    if (
+                        change_detect_counter >=
+                        CHANGE_REQUIRED_FRAMES
+                    ):
+                        enter_second_verify_stage = True
+
+                        img.draw_string(
+                            10,
+                            255,
+                            "CHANGE SEEN, VERIFY AGAIN",
+                            color=(0, 255, 0),
+                            scale=2
+                        )
+
+            # ------------------------------------------------
+            # 第三级：真实2倍，但半区域结果仍应稳定为1
+            # ------------------------------------------------
+
+            else:
+                img.draw_string(
+                    10,
+                    170,
+                    "STEP3: VERIFY REAL X=2",
+                    color=(0, 255, 255),
+                    scale=2
+                )
+
+                img.draw_string(
+                    10,
+                    200,
+                    "HALF ROI EXPECT VALUE=1",
+                    color=(0, 255, 255),
+                    scale=1
+                )
+
+                second_valid = second_signature_is_valid(
+                    frequency_result,
+                    first_frequency_signature
+                )
+
+                if second_valid:
+                    second_verify_counter += 1
+
+                    img.draw_string(
+                        10,
+                        225,
+                        "SECOND 1 CONFIRM:%d/%d" % (
+                            second_verify_counter,
+                            SECOND_VERIFY_HOLD_FRAMES
+                        ),
+                        color=(0, 255, 0),
+                        scale=2
+                    )
+
+                    if (
+                        second_verify_counter >=
+                        SECOND_VERIFY_HOLD_FRAMES
+                    ):
+                        switch_to_phase = True
+
+                        img.draw_string(
+                            10,
+                            255,
+                            "REAL 1->2 PASS, PHASE",
+                            color=(0, 255, 0),
+                            scale=2
+                        )
+
+                else:
+                    second_verify_counter = 0
+
+                    if (
+                        locked and
+                        multiple ==
+                        SECOND_VERIFY_MEASURED_MULTIPLE
+                    ):
+                        img.draw_string(
+                            10,
+                            225,
+                            "VALUE=1 BUT IMAGE SAME",
+                            color=(255, 0, 0),
+                            scale=2
+                        )
+
+                    elif locked:
+                        img.draw_string(
+                            10,
+                            225,
+                            "VALUE=%d, NEED 1" %
+                            multiple,
+                            color=(255, 0, 0),
+                            scale=2
+                        )
+
+                    else:
+                        img.draw_string(
+                            10,
+                            225,
+                            "WAIT NEW STABLE VALUE=1",
+                            color=(255, 255, 0),
+                            scale=2
+                        )
+
+        # ====================================================
+        #                    测相位模式
+        # ====================================================
+
+        else:
+            phase_step(
+                img
+            )
+
+            img.draw_string(
+                10,
+                190,
+                "PROTECT PASS: REAL X 1->2",
+                color=(0, 255, 0),
+                scale=1
+            )
+
+        # ====================================================
+        #                    公共显示
+        # ====================================================
+
+        img.draw_string(
+            10,
+            IMAGE_HEIGHT - 25,
+            "FPS:%.1f" %
+            clock.fps(),
+            color=(255, 255, 255),
+            scale=1
+        )
+
+        Display.show_image(
+            img
+        )
+
+        # ====================================================
+        #             显示完成后执行状态切换
+        # ====================================================
+
+        if enter_wait_change_stage:
+            frequency_verify_stage = (
+                FREQ_VERIFY_STAGE_WAIT_CHANGE
+            )
+
+            first_verify_counter = 0
+            change_guard_counter = 0
+            change_detect_counter = 0
+            second_verify_counter = 0
+
+            # 这里故意不清除测频稳定历史：
+            # 如果用户没有调节，原图会继续保持锁定且签名相同，
+            # 不会被误判为“已发生变化”。
+            print(
+                "VERIFY STEP1 PASS:",
+                "measured_value=1",
+                "baseline_signature_saved",
+                "please change real ratio to 2"
+            )
+
+        if enter_second_verify_stage:
+            frequency_verify_stage = (
+                FREQ_VERIFY_STAGE_SECOND_ONE
+            )
+
+            change_detect_counter = 0
+            second_verify_counter = 0
+
+            # 变化已经确认后，清空测频稳定历史。
+            # 第二次必须从头连续稳定识别。
+            reset_frequency_detection_state()
+
+            print(
+                "FREQUENCY IMAGE CHANGE CONFIRMED:",
+                "start second measured-value=1 verification"
+            )
+
+        if switch_to_phase:
+            if (
+                frequency_verify_stage ==
+                FREQ_VERIFY_STAGE_SECOND_ONE
+            ):
+                reset_phase_state()
+                reset_frequency_detection_state()
+
+                system_mode = MODE_PHASE
+
+                first_verify_counter = 0
+                change_guard_counter = 0
+                change_detect_counter = 0
+                second_verify_counter = 0
+
+                print(
+                    "VERIFY STEP3 PASS:",
+                    "real_ratio_changed_1_to_2",
+                    "half_roi_measured_value=1"
+                )
+
+                print(
+                    "SYSTEM SWITCH:",
+                    "FREQUENCY -> PHASE"
+                )
+
+        img = None
+        gc.collect()
+
+
+# ============================================================
+#                          程序入口
+# ============================================================
+
+try:
+    camera_init()
+    main_loop()
+
+except KeyboardInterrupt:
+    print(
+        "Program stopped by user"
+    )
+
+except BaseException as e:
+    print(
+        "Program exception:",
+        e
+    )
+
+finally:
+    camera_deinit()

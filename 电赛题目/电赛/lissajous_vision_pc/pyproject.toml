@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lissajous-vision"
+version = "0.1.0"
+description = "PC-side vision prototype for the 2026 contest Lissajous display controller"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=2.0",
+    "opencv-python>=4.10",
+    "Pillow>=10.0",
+    "pyserial>=3.5",
+    "mcp>=1.28,<2",
+]
+
+[project.scripts]
+lissajous-vision = "lissajous_vision.cli:main"
+lissajous-vision-mcp = "mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lissajous_vision*"]
+
+[tool.setuptools]
+py-modules = ["mcp_server"]

@@ -1,0 +1,6 @@
+"lcd1602.obj",
+"main.obj",
+"ad7606.obj",
+"delay.obj" 
+TO "ad7606" 
+RAMSIZE(256) 

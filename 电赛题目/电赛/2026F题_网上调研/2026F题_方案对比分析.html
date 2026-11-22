@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026 电赛 F题「李萨如图形显示控制装置」网上方案调研与对比分析</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --ink:#1a2332; --sub:#5b6b7f; --line:#e3e8ef;
+    --blue:#1f6feb; --blue-bg:#eef4ff; --green:#1a7f37; --green-bg:#e8f7ee;
+    --red:#cf222e; --red-bg:#fff0f0; --amber:#9a6700; --amber-bg:#fff8e5;
+    --purple:#6e40c9; --purple-bg:#f4efff;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:"Microsoft YaHei","PingFang SC",-apple-system,sans-serif; line-height:1.65; font-size:15px;}
+  .wrap{max-width:1080px; margin:0 auto; padding:28px 20px 80px;}
+  header.hero{background:linear-gradient(135deg,#12264d 0%,#1f3d7a 55%,#2a5298 100%); color:#fff; border-radius:14px; padding:34px 36px; margin-bottom:26px;}
+  header.hero h1{font-size:26px; letter-spacing:.5px; margin-bottom:10px;}
+  header.hero p{color:#c9d6f2; font-size:14px;}
+  .meta{display:flex; flex-wrap:wrap; gap:10px; margin-top:16px;}
+  .meta span{background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.25); padding:3px 12px; border-radius:20px; font-size:12.5px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:22px 26px; margin-bottom:20px; box-shadow:0 1px 3px rgba(20,30,60,.05);}
+  h2{font-size:20px; margin-bottom:14px; padding-bottom:8px; border-bottom:2px solid var(--blue); color:#16325f;}
+  h3{font-size:16.5px; margin:18px 0 10px; color:#1f3d7a;}
+  h4{font-size:15px; margin:14px 0 8px; color:#2a5298;}
+  p{margin:8px 0;}
+  ul,ol{margin:8px 0 8px 22px;}
+  li{margin:4px 0;}
+  table{border-collapse:collapse; width:100%; margin:12px 0; font-size:13.5px;}
+  th{background:#f0f4fb; color:#16325f; text-align:left; padding:8px 10px; border:1px solid var(--line); font-weight:600; white-space:nowrap;}
+  td{padding:8px 10px; border:1px solid var(--line); vertical-align:top; background:#fff;}
+  tr:nth-child(even) td{background:#fafbfd;}
+  .tag{display:inline-block; padding:1px 9px; border-radius:12px; font-size:12px; font-weight:600; white-space:nowrap;}
+  .t-ok{background:var(--green-bg); color:var(--green);}
+  .t-bad{background:var(--red-bg); color:var(--red);}
+  .t-warn{background:var(--amber-bg); color:var(--amber);}
+  .t-info{background:var(--blue-bg); color:var(--blue);}
+  .t-purple{background:var(--purple-bg); color:var(--purple);}
+  .t-gray{background:#eef0f3; color:#5b6b7f;}
+  .verdict{background:var(--green-bg); border:1px solid #b8e0c6; border-left:5px solid var(--green); border-radius:8px; padding:14px 18px; margin:12px 0;}
+  .verdict.red{background:var(--red-bg); border-color:#f3c0c0; border-left-color:var(--red);}
+  .verdict.amber{background:var(--amber-bg); border-color:#ecd9a8; border-left-color:var(--amber);}
+  .verdict.blue{background:var(--blue-bg); border-color:#c5d9f7; border-left-color:var(--blue);}
+  .src{color:var(--sub); font-size:12px; word-break:break-all;}
+  .src a{color:#2a5298; text-decoration:none;}
+  .src a:hover{text-decoration:underline;}
+  .kpi{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:14px 0;}
+  .kpi div{background:#f7f9fc; border:1px solid var(--line); border-radius:10px; padding:12px 14px;}
+  .kpi .num{font-size:22px; font-weight:700; color:var(--blue); display:block;}
+  .kpi .lbl{font-size:12.5px; color:var(--sub);}
+  code{background:#f1f3f6; border:1px solid var(--line); border-radius:4px; padding:1px 6px; font-size:13px; font-family:Consolas,monospace;}
+  .flow{background:#f7f9fc; border:1px solid var(--line); border-radius:8px; padding:12px 16px; font-size:13.5px; margin:10px 0;}
+  .footnote{font-size:12px; color:var(--sub); margin-top:8px;}
+  .toc{columns:2; column-gap:30px; font-size:14px;}
+  .toc a{color:#1f3d7a; text-decoration:none;}
+  .toc a:hover{text-decoration:underline;}
+  @media(max-width:720px){.toc{columns:1;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>2026 电赛 F题「李萨如图形显示控制装置」<br>网上公开方案调研与对比分析</h1>
+  <p>调研时间：2026-10-18 ｜ 渠道：GitHub / Gitee / 立创开源广场 / CSDN / 电子论坛 / B站 / 抖音 / 知乎 / 微信公众号 / 英文学术文献 / 往年同源赛题</p>
+  <div class="meta">
+    <span>对比基线：用户自研方案（STM32F407 + AD9959 + K230 + PC原型）</span>
+    <span>核心问题：方案目前无法实现，网上是否有更优方案？</span>
+  </div>
+</header>
+
+<!-- ================= 目录 ================= -->
+<div class="card">
+  <h2>目录</h2>
+  <div class="toc">
+    <ol>
+      <li><a href="#s1">结论速览（先读）</a></li>
+      <li><a href="#s2">题目要点与判分基准</a></li>
+      <li><a href="#s3">网上公开方案全景（按渠道）</a></li>
+      <li><a href="#s4">核心难题的公开解法：断开后如何得知输入频率/相位</a></li>
+      <li><a href="#s5">你的方案为什么走不通（逐条卡点 + 网上证据）</a></li>
+      <li><a href="#s6">逐维度对比表</a></li>
+      <li><a href="#s7">结论：有没有更优方案？</a></li>
+      <li><a href="#s8">可执行改造路线（分阶段）</a></li>
+      <li><a href="#s9">风险与合规提示</a></li>
+      <li><a href="#s10">来源清单与查证等级</a></li>
+    </ol>
+  </div>
+</div>
+
+<!-- ================= 结论速览 ================= -->
+<div class="card" id="s1">
+  <h2>一、结论速览</h2>
+
+  <div class="verdict red">
+    <b>结论①　没有"现成完整成品"可以直接替换你的方案。</b>截至 2026-10-18，GitHub 仓库搜索"李萨如 电赛""2026 李萨"均为 <b>0 结果</b>，立创开源广场"李萨如"为 0 工程，GitHub"电赛 2026"198 个仓库里全是 E 题（拼图）、H 题（滚球）等，<b>没有任何仓库实现了本题要求5的"断开信号源 + 摄像头闭环"</b>。你的方案在公开开源世界里并不落后。
+  </div>
+
+  <div class="verdict amber">
+    <b>结论②　存在比你更成体系的公开解法，可借鉴度很高。</b>头号对标是 <b>上海交大E谷电赛训练营</b>的 2026 F题三集方案（明标"全开源带上位机"），其中专门有一集《视觉频率检测方案》直击要求5核心难题；另有抖音队伍实测"视觉部分 <b>12秒锁频锁相</b>"（282赞），证明纯视觉路线在 10s 预算边上可行。此外还有学术文献给出了比你的"四边波峰计数"更鲁棒的测频算法（翻转周期法）。
+  </div>
+
+  <div class="verdict red">
+    <b>结论③　你方案"无法实现"的直接死因有网上证据支撑，不是整体架构错，而是两处方法选型 + 一处实现与规格矛盾：</b>
+    <ul style="margin-top:6px;">
+      <li><b>K230 实际实现与题目规格矛盾</b>：你的 K230 端只支持 10kHz 步进输入（README 原文），而题目是 100Hz 步进 991 频点——按现状实现，题目任意抽一个非 10kHz 整数倍的频点（如 10.1kHz）就会挂；规格文档里的"192点探测表覆盖991频点"与代码没有对齐。</li>
+      <li><b>波峰计数 41.1% 准确率是方法选错观测变量</b>（哈工大讲义印证）：切点数法 n<sub>x</sub>/n<sub>y</sub> = f<sub>y</sub>/f<sub>x</sub> 只在<b>严格整数比</b>下成立；断开模式下两路独立时钟存在频差，图形持续旋转，切点数逐帧跳变——单帧"左==右、上==下"严格门在旋转图形上天然失效，不是代码 bug。</li>
+      <li><b>192 点 × 30ms 的 10s 预算在 K230 MicroPython 上不可行</b>：串口往返 + 双帧曝光 + find_blobs 计数，单点 30ms 是极端乐观值；更优路线是"视觉直接测频"（1 个探测点即可），根本不需要全扫 192 点。</li>
+    </ul>
+  </div>
+
+  <div class="verdict blue">
+    <b>结论④　建议动作（按优先级）：</b>① 去 B站 E谷三集视频简介区手动取开源仓库链接（本次检索受平台限制未能读到仓库 URL）；② 把 K230 观测算法从"四边波峰计数"换成<b>翻转周期法（归一化面积曲线）</b>；③ 搜索策略从"192点全扫"改为"包络粗分类 + 旋转速率闭环精锁"；④ 参考 AD9959 HAL 驱动、椭圆拟合测相等已查证的可复用件。详细路线见<a href="#s8">第八节</a>。
+  </div>
+</div>
+
+<!-- ================= 题目要点 ================= -->
+<div class="card" id="s2">
+  <h2>二、题目要点与判分基准（对比准绳）</h2>
+  <table>
+    <tr><th>要求</th><th>分值</th><th>内容</th><th>硬指标</th></tr>
+    <tr><td>要求1</td><td>5</td><td>直通模式，8×8div 对角线</td><td>—</td></tr>
+    <tr><td>要求2</td><td>15</td><td>输出与输入正交、等幅 → 圆/椭圆</td><td>幅度误差 ≤ 0.2div</td></tr>
+    <tr><td>要求3</td><td>25</td><td>输出为输入 2 倍频、等幅 → ∞ 形</td><td>上下左右对称，误差 ≤ 0.2div</td></tr>
+    <tr><td>要求4</td><td>15</td><td>Y 轴幅度可设 2/4/6/8div</td><td>误差 ≤ 0.2div</td></tr>
+    <tr><td>要求5</td><td>40</td><td><b>断开信号源与装置（无电气耦合）</b>，3 个独立按钮一键启动 3 种自动模式，<b>摄像头拍示波器屏幕</b>，自动识别并控制显示对角线/圆/∞，声光提示</td><td>控制 ≤ 10s（每超1s扣1分）；稳定 ≥ 5s（每差1s扣1分）</td></tr>
+    <tr><td>要求6</td><td>20</td><td>设计报告</td><td>—</td></tr>
+  </table>
+  <p class="footnote">输入：正弦 1kHz~100kHz、<b>步进 100Hz（共 991 频点）</b>，频率点<b>不得预存在装置中</b>；示波器 X/Y 灵敏度均 0.5V/div，8×8div 栅格。测试允许挡板遮挡示波器屏幕外部分、关闭测量信息窗口；<b>摄像头不得拍信号源面板</b>。</p>
+  <p class="footnote">来源：官方赛题公示页 <span class="src"><a href="https://res.nuedc-training.com.cn/topic/2026/topic_from_31.html">res.nuedc-training.com.cn/topic/2026/topic_from_31.html</a>（已查证）</span>；题目汇总 <span class="src"><a href="https://www.eet-china.com/mp/a513478.html">eet-china.com/mp/a513478.html</a>（已查证）</span>；福建赛区 <span class="src"><a href="https://fjuedc.fzu.edu.cn/info/1013/1243.htm">fjuedc.fzu.edu.cn/info/1013/1243.htm</a>（已查证）</span>。你的项目目录内 <code>F题_李萨如图形显示控制装置.pdf</code> 即官方题面。</p>
+</div>
+
+<!-- ================= 网上方案全景 ================= -->
+<div class="card" id="s3">
+  <h2>三、网上公开方案全景（按渠道）</h2>
+
+  <h3>3.1 B站：E谷电赛训练营（上海交大E谷指导点）—— 头号对标，自称全开源</h3>
+  <table>
+    <tr><th>视频</th><th>BV号 / 时间 / 播放</th><th>内容要点</th><th>开源声明</th><th>查证</th></tr>
+    <tr>
+      <td>2026电赛F题李萨如图方案（全网首发）</td>
+      <td><span class="src"><a href="https://www.bilibili.com/video/BV1uF3k6YExu/">BV1uF3k6YExu</a></span><br>2026-07-29 · 5761</td>
+      <td>总体方案。简介原文："E谷电赛训练营的DDS模块可实现<b>单片机DAC与AD9834 DDS叠加输出</b>，以及幅度、频率、相位调制"——硬件路线比你的 AD9959 更轻量</td>
+      <td><span class="tag t-ok">自称全开源</span></td>
+      <td><span class="tag t-ok">已查证</span></td>
+    </tr>
+    <tr>
+      <td>F题李萨如图<b>视觉频率检测方案</b>【全开源带上位机】</td>
+      <td><span class="src"><a href="https://www.bilibili.com/video/BV1ekGF6oEec/">BV1ekGF6oEec</a></span><br>2026-07-31 · 2761 · 33:40</td>
+      <td><b>直击要求5核心难题：断开信号源后用视觉从屏幕图形反推频率</b>，配合上位机；标签：视觉/信号链/STM32/DDS/DAC</td>
+      <td><span class="tag t-ok">自称全开源带上位机</span></td>
+      <td><span class="tag t-ok">已查证</span></td>
+    </tr>
+    <tr>
+      <td>F题李萨如图非视觉部分方案【全开源带上位机】</td>
+      <td><span class="src"><a href="https://www.bilibili.com/video/BV1mL3x67EAU/">BV1mL3x67EAU</a></span><br>2026-07-30 · 4501 · 35:57</td>
+      <td>要求1~4 有线部分：信号发生/倍频/移相/幅度控制信号链 + 上位机</td>
+      <td><span class="tag t-ok">自称全开源带上位机</span></td>
+      <td><span class="tag t-ok">已查证（标题）</span></td>
+    </tr>
+  </table>
+  <div class="verdict amber">
+    <b>缺口（如实记录）</b>：三集视频简介页均未直接给出仓库链接（B站简介为动态渲染，检索工具无法读取），"全开源"的代码分发渠道疑似在 E谷公众号/评论区。需要你手动打开三个视频页的简介区复制链接（可能是 kdocs/网盘/gitee）。
+  </div>
+
+  <h3>3.2 B站：实物获奖作品与难度旁证</h3>
+  <table>
+    <tr><th>视频</th><th>链接</th><th>关键信息</th><th>查证</th></tr>
+    <tr><td>2026年电赛F题 山东省省一等奖（排名第一）</td><td><span class="src"><a href="https://www.bilibili.com/video/BV17kp16DEAK/">BV17kp16DEAK</a></span></td><td>2026-10-14 发布，仅实物演示，无架构/代码；名次证明该题可完成</td><td><span class="tag t-ok">已查证</span></td></tr>
+    <tr><td>26电赛F题 满分拿下</td><td><span class="src"><a href="https://www.bilibili.com/video/BV1TDGT6vE9T/">BV1TDGT6vE9T</a></span></td><td>27秒演示；简介"有需要+q2972857223"——<b>留QQ售卖，不开源</b></td><td><span class="tag t-ok">已查证</span></td></tr>
+    <tr><td>26电赛F题第五问视觉（测试片段）</td><td><span class="src"><a href="https://www.bilibili.com/video/BV1E9bf6GEkd/">BV1E9bf6GEkd</a></span></td><td>作者原话："…由于时间太紧最后的实际视频没有录，<b>第五问实在难度不小</b>"——要求5难度旁证</td><td><span class="tag t-ok">已查证（简介原文）</span></td></tr>
+    <tr><td>2026年电赛F题_方案分析（长江大学唐老师）</td><td><span class="src"><a href="https://www.bilibili.com/video/BV1n1uy6XELD/">BV1n1uy6XELD</a></span></td><td>教师视角拆解；提到测试频点 10.1k/20.1k/90.1kHz（均在100Hz网格内）、"没有摄像头最多60分"（即要求5 40分拿不到）</td><td><span class="tag t-ok">已查证</span></td></tr>
+    <tr><td>26年F题 STM32H743IIT6 方案（除视觉部分）</td><td>B站"薄青青薄情"</td><td>有省奖队主控用 <b>STM32H743</b>（算力余量大于 F407）</td><td><span class="tag t-warn">一方说法（仅标题）</span></td></tr>
+    <tr><td>【开源】2022 TI杯邀请赛X题 李萨如图形演示装置</td><td><span class="src"><a href="https://www.bilibili.com/video/BV1oG411G7Hq/">BV1oG411G7Hq</a></span></td><td>历史同源题开源：CD4046锁相 + 74HC161倍频 + 二阶有源滤波 + 数字电位器AGC；当年二等奖（评论区自述扣分20+）</td><td><span class="tag t-ok">已查证（含评论）</span></td></tr>
+  </table>
+
+  <h3>3.3 抖音：要求5可行性实证 + 全场共性痛点</h3>
+  <table>
+    <tr><th>视频</th><th>链接</th><th>关键信息</th><th>查证</th></tr>
+    <tr>
+      <td>26电赛F题 视觉部分<b>12秒锁频锁相</b></td>
+      <td><span class="src"><a href="https://www.iesdouyin.com/share/video/7671648966278684858">iesdouyin.com/share/video/7671648966278684858</a></span></td>
+      <td>断开信号源后摄像头拍屏 → 视觉锁频锁相全程约 <b>12s</b>（282赞）——略超10s预算（约扣1~2分）但<b>证明纯视觉路线跑得通</b></td>
+      <td><span class="tag t-ok">已查证</span></td>
+    </tr>
+    <tr>
+      <td>软件锁相求助：抖动卡0.2div边缘想转FPGA</td>
+      <td><span class="src"><a href="https://www.iesdouyin.com/share/video/7668190167618061226">iesdouyin.com/share/video/7668190167618061226</a></span></td>
+      <td>"1k~100k都能锁住，放大后有抖动卡0.2div边缘，单片机好像到极限了"——<b>与你的0.2div精度痛点完全同病</b>（159赞）</td>
+      <td><span class="tag t-ok">已查证</span></td>
+    </tr>
+    <tr>
+      <td>"晶振误差真恶心人"（第五问断开实测）</td>
+      <td><span class="src"><a href="https://www.iesdouyin.com/share/video/7668899806928999598">iesdouyin.com/share/video/7668899806928999598</a></span></td>
+      <td>吐槽独立时钟晶振漂移——<b>与你的"独立时钟漂移需持续微调"完全同病</b>（129赞）</td>
+      <td><span class="tag t-ok">已查证</span></td>
+    </tr>
+  </table>
+
+  <h3>3.4 GitHub / 立创开源广场 / Gitee：无完整F题成品，但有可复用碎片</h3>
+  <div class="verdict red">
+    <b>零命中证据（已查证）</b>：GitHub 仓库搜索 <code>李萨如 电赛</code> = 0 results；<code>2026 李萨</code> = 0 results；代码搜索 <code>电子设计竞赛 李萨如</code> = 无命中；oshwhub 搜 <code>李萨如</code> = 工程0/文章0/用户0；GitHub <code>电赛 2026</code> 198个仓库全是 E题/H题；通用 <code>lissajous</code> 984个仓库全是 JS/音频可视化。Gitee 搜索页无法正常加载（link dead）。<b>2026 F题（8月初完赛）正处于"获奖队伍还没放源码"的时间窗，建议 11~12 月复搜。</b>
+  </div>
+  <table>
+    <tr><th>可复用件</th><th>URL</th><th>说明</th><th>对你的价值</th><th>查证</th></tr>
+    <tr>
+      <td>Silver-Ray/AD9959_HAL_DRIVER</td>
+      <td><span class="src"><a href="https://github.com/Silver-Ray/AD9959_HAL_DRIVER">github.com/Silver-Ray/AD9959_HAL_DRIVER</a></span></td>
+      <td>STM32F407ZGT6 + HAL 库 AD9959 四线串行驱动（28★），四通道独立幅/频/相，含扫频/ASK/FSK，.ioc 可直接导入 CubeIDE</td>
+      <td><b>替换你的 GPIO 模拟时序</b>，省 CPU 且时序更稳（同芯片）</td>
+      <td><span class="tag t-ok">已查证</span></td>
+    </tr>
+    <tr>
+      <td>chuxuezhe766/K230</td>
+      <td><span class="src"><a href="https://github.com/chuxuezhe766/K230">github.com/chuxuezhe766/K230</a></span></td>
+      <td>K230 CanMV MicroPython 色块/矩形/动态阈值例程（108★，Apache-2.0）</td>
+      <td>K230 视觉基础能力参考</td>
+      <td><span class="tag t-ok">已查证</span></td>
+    </tr>
+    <tr>
+      <td>zuoliangyu/NUEDC_TOPIC</td>
+      <td><span class="src"><a href="https://github.com/zuoliangyu/NUEDC_TOPIC">github.com/zuoliangyu/NUEDC_TOPIC</a></span></td>
+      <td>历年电赛真题 PDF 归档（121★，已更新到2026）</td>
+      <td>题面核对</td>
+      <td><span class="tag t-warn">一方说法</span></td>
+    </tr>
+    <tr>
+      <td>SENTINEL-Vision（电赛视觉通用框架）</td>
+      <td><span class="src"><a href="https://www.bilibili.com/video/BV1TXb5zLEWc/">bilibili.com/video/BV1TXb5zLEWc</a></span>（GitHub: ziqi-ning/SENTINEL-Vision.git）</td>
+      <td>OpenCV 电赛视觉成品集合（树莓派/Jetson）</td>
+      <td>可作你 PC 端 OpenCV 原型的现成框架底座</td>
+      <td><span class="tag t-warn">一方说法</span></td>
+    </tr>
+  </table>
+
+  <h3>3.5 学术文献与历史同源题</h3>
+  <table>
+    <tr><th>资源</th><th>URL</th><th>方案/指标</th><th>对你的价值</th><th>查证</th></tr>
+    <tr>
+      <td><b>IIETA 论文：李萨如翻转周期高精度测频</b></td>
+      <td><span class="src"><a href="https://iieta.org/journals/ts/paper/10.18280/ts.400312">iieta.org/journals/ts/paper/10.18280/ts.400312</a></span></td>
+      <td>相机拍屏 → 逐帧二值化 → 归一化亮区面积曲线 → 负峰间距 = 图形旋转周期 T → <b>Δf = 1/(m·T)</b> 反推频差（m 为频率比，1:1 时 m=1，2:1 时 m=2）。30fps/0.5s 观察窗 → 可分辨约 ±2Hz 频差；作者自评精度与帧率成正比、还需提升</td>
+      <td><b>替代四边波峰计数的直接算法</b>：MicroPython 只需数阈值像素总数，计算量低于 find_blobs，且对 ∞ 形同样成立</td>
+      <td><span class="tag t-ok">已查证（全文精读）</span></td>
+    </tr>
+    <tr>
+      <td>2022 TI杯邀请赛 X题《李萨如图形演示装置》（本题直系前身）</td>
+      <td><span class="src"><a href="https://view.inews.qq.com/a/20220908A011Q300">view.inews.qq.com/a/20220908A011Q300</a></span>；冠军报道 <span class="src"><a href="https://www.eeworld.com.cn/mndz/hisic621366.html">eeworld.com.cn/mndz/hisic621366.html</a></span></td>
+      <td>有线模式：LM339整形 → CD4046 PLL + 74HC161 分频倍频 → 3阶切比雪夫滤波 → 数字电位器AGC；双路过零方波测相位。<b>明令禁止数字处理</b>。指标：倍频误差≤100Hz、幅度≤0.1V、相位≤5°</td>
+      <td>证明要求5（断开+摄像头）是全新难度；其模拟锁相链可作要求3倍频的硬件兜底参照</td>
+      <td><span class="tag t-ok">已查证</span></td>
+    </tr>
+    <tr>
+      <td>哈工大物理实验讲义：切点数法测未知频率</td>
+      <td><span class="src"><a href="https://elcap.hit.edu.cn/_upload/article/files/72/be/086e12d94921a6875516f06450f3/ab5bd527-2c09-4b51-a149-73ce6abc41c4.pdf">elcap.hit.edu.cn（PDF）</a></span></td>
+      <td>经典切点法 n<sub>x</sub>/n<sub>y</sub> = f<sub>y</sub>/f<sub>x</sub>，数横竖切点数定频率比——<b>只在严格整数比下有效</b></td>
+      <td><b>解释你 41.1% 准确率根因</b>：断开模式下图形持续旋转，切点数不稳定</td>
+      <td><span class="tag t-ok">已查证（摘要）</span></td>
+    </tr>
+    <tr>
+      <td>椭圆拟合测相（PLEF / 物理学报 LOF 椭圆拟合）</td>
+      <td><span class="src"><a href="https://wulixb.iphy.ac.cn/en/article/pdf/preview/10.7498/aps.71.20220401.pdf">物理学报 LOF 椭圆拟合（PDF）</a></span></td>
+      <td>对屏幕二值化轨迹做最小二乘椭圆拟合：长短轴比 → 幅度比与相位（圆 a/b≈1、φ≈90°；对角线 b≈0、φ≈0°）；理想条件相位误差 1e-4 rad 量级</td>
+      <td><b>单帧同时判圆/判幅度/判相位</b>，替代"左==右、上==下"严格相等门</td>
+      <td><span class="tag t-warn">一方说法（摘要级）</span></td>
+    </tr>
+    <tr>
+      <td>IDC：AD9850 双 DDS 李萨如硬件（短时微扰锁频）</td>
+      <td><span class="src"><a href="https://www.idc-online.com/technical_references/pdfs/electronic_engineering/Hardware_of_Lissajous_Curves.pdf">idc-online.com（PDF）</a></span></td>
+      <td>双 DDS 共享主时钟 + 短时微扰一路频率到目标相位后恢复锁定，相位分辨率约 1.5°（AD9850 相位寄存器步进 11.25° 太粗）</td>
+      <td><b>补强你的相位 PI</b>：粗相位寄存器外叠加"微扰定时锁定"精锁</td>
+      <td><span class="tag t-ok">已查证</span></td>
+    </tr>
+  </table>
+</div>
+
+<!-- ================= 核心难题 ================= -->
+<div class="card" id="s4">
+  <h2>四、核心难题的公开解法：断开后如何得知输入频率/相位</h2>
+  <p>这是要求5（40分）的灵魂，也是区分度所在。公开社区的解法盘点：</p>
+  <table>
+    <tr><th>路线</th><th>公开证据</th><th>合规性</th><th>可行性判断</th></tr>
+    <tr>
+      <td><b>① 纯视觉测频（主流、唯一被公开验证）</b></td>
+      <td>E谷《视觉频率检测方案》一集（已查证）；抖音"12秒锁频锁相"实测（已查证）；IIETA 翻转周期法论文（已查证）</td>
+      <td><span class="tag t-ok">合规</span> 顺着题目"挡板遮挡、关闭测量窗口、只能看图形"的限制走</td>
+      <td>主流路线。核心技巧：<b>图形旋转/翻转周期 = 频差的灵敏指示器</b>（Δf = 1/(m·T)），不需要数出精确频率数值，只需要把图形"锁稳"</td>
+    </tr>
+    <tr>
+      <td>② 摄像头拍屏幕上的频率读数（OCR）</td>
+      <td>未找到任何专门帖子（题目"关闭测量信息窗口"基本封死此路）</td>
+      <td><span class="tag t-bad">大概率违规/被封</span></td>
+      <td>不可行</td>
+    </tr>
+    <tr>
+      <td>③ 示波器 USB/网口 SCPI 读测量值</td>
+      <td>scopebench-mcp（PyPI，USB 读 RIGOL 测量值）、Tektronix OpenChoice、Telonic LAN 截图例——技术上成熟，但<b>没有任何电赛队伍把它用作本题方案</b></td>
+      <td><span class="tag t-bad">默认违规</span> 题目强制"摄像头拍屏幕 + 挡板封闭"，接裁判示波器数据口几乎必然违规</td>
+      <td>技术上可行、规则上不可行；仅作为"需向组委会确认"的记录</td>
+    </tr>
+    <tr>
+      <td>④ 预存 991 频点表</td>
+      <td>无人公开采用（题目明令"频率点不得预存在装置中"）</td>
+      <td><span class="tag t-bad">明确违规</span></td>
+      <td>不可行</td>
+    </tr>
+    <tr>
+      <td>⑤ 装置与信号源通信/串口传频率</td>
+      <td>未找到（题目"不得有任何电气耦合"）</td>
+      <td><span class="tag t-bad">明确违规</span></td>
+      <td>不可行</td>
+    </tr>
+  </table>
+  <div class="verdict blue">
+    <b>关键认知</b>：题目并不要求装置"读出频率数值"，只要求"图形正确且稳定"。所以正确思路不是高精度测频，而是<b>视觉PLL（锁频环）</b>：先用粗信息把 DDS 频率拉到未知频率附近（几百 Hz 以内），然后靠"图形是否旋转/旋转多快"做负反馈把频差压到 0——这正是 IIETA 公式 Δf=1/(m·T) 的用武之地，也是 E谷"视觉频率检测"和抖音 12 秒队的做法。你的方案 md 里"频率微调 + 相位爬山"规格方向完全正确，卡住的是它前面的"粗定位"环节。
+  </div>
+</div>
+
+<!-- ================= 卡点诊断 ================= -->
+<div class="card" id="s5">
+  <h2>五、你的方案为什么走不通（逐条卡点 + 网上证据）</h2>
+  <table>
+    <tr><th>#</th><th>卡点</th><th>严重度</th><th>网上证据 / 理论依据</th><th>性质判断</th></tr>
+    <tr>
+      <td>1</td>
+      <td><b>K230 只支持 10kHz 步进输入，与题目 100Hz 步进 991 频点矛盾</b></td>
+      <td><span class="tag t-bad">致命（直接死因）</span></td>
+      <td>你的 K230 README 原文："当前只接受 10~100kHz、步进 10kHz 的未知 X 轴输入"、五点粗扫 10/20/30/50/70kHz；而题目为 1kHz~100kHz、100Hz 步进、991 频点（官方公示页）。两者无法对齐——题目抽 10.1kHz/33.3kHz 等任意非 10kHz 整数倍频点即挂</td>
+      <td><b>实现与规格自相矛盾</b>：规格文档（192点探测表覆盖991频点）与 K230 实际代码（10kHz 五点）没有对齐，至少一头是空的。这是"无法实现"最直接的候选根因</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><b>波峰计数单帧准确率仅 41.1%，高倍频几乎不可用</b></td>
+      <td><span class="tag t-bad">致命</span></td>
+      <td>哈工大实验讲义（已查证）：切点数法 n<sub>x</sub>/n<sub>y</sub>=f<sub>y</sub>/f<sub>x</sub> <b>只在严格整数比下成立</b>。断开模式下两路独立时钟存在微频差，图形持续旋转（mysimulator.uk：旋转速度本身就是微频差的灵敏指示器，已查证），切点数在整数附近逐帧跳变</td>
+      <td><b>方法选错观测变量，不是代码 bug</b>：单帧"左==右、上==下"严格门在旋转图形上天然被破坏。你的实测数据（1倍75.9%→10倍0%）正是"倍频越高、对整数比越敏感"的体现</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><b>192 点 × 30ms 的 10s 预算在 K230 MicroPython 上不可行</b></td>
+      <td><span class="tag t-bad">致命</span></td>
+      <td>每点需 SET→等 APPLIED→丢旧帧→等新帧→find_blobs 计数，串口往返+曝光+处理，30ms/点是极端乐观值；且 41.1% 有效帧意味着每点平均要 2~3 帧。抖音 12 秒队证明可行路径是"视觉直接测频"而非全扫；E谷也是"视觉频率检测"单独一集</td>
+      <td><b>策略选型问题</b>：需要的是"1 个探测点测出频差"（翻转周期法）或"粗扫包络+精锁"，不是 192 点全扫</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><b>独立时钟漂移（名义同频也需持续微调）</b></td>
+      <td><span class="tag t-warn">严重但非致命</span></td>
+      <td>抖音"晶振误差真恶心人"（129赞，已查证）；"抖动卡0.2div边缘想转FPGA"（159赞，已查证）——<b>全场共性痛点，不是你独有</b></td>
+      <td><b>方案方向正确</b>：你的规格 md 第9.3节（相位斜率→频率微调，±40Hz限幅）和9.4节（HOLD相位爬山）写的是对的，缺的是跑通前面三步后把闭环接起来</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><b>三端代码量大、调试链长（F407+K230+PC）</b></td>
+      <td><span class="tag t-warn">工程风险</span></td>
+      <td>E谷方案分工是"单片机信号链 + <b>上位机</b>做视觉"（"全开源带上位机"标题，已查证）；你的 PC OpenCV 原型已很完整，但比赛里 PC 端没被用上，K230 MicroPython 扛了不该扛的算力</td>
+      <td><b>架构可调整</b>：视觉算力要么上移（PC/上位机，E谷同款分工），要么 K230 只跑"数阈值像素"这种轻量算法（翻转周期法足够轻）</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><b>∞形（2:1）相位闭环无参考信号</b></td>
+      <td><span class="tag t-warn">严重但可解</span></td>
+      <td>你已在规格 md 红线3 正确识别："2:1 比例分数不随相位变化，不能指导相位闭环"，需要 E_inf 对称评分（md 第8.3节已写）；IIETA 翻转周期法对 2:1 同样成立（m=2）</td>
+      <td><b>方向正确</b>：用镜像对称 IoU/交叉点距离做相位评分即可，无需外部参考</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ================= 逐维度对比 ================= -->
+<div class="card" id="s6">
+  <h2>六、逐维度对比表</h2>
+  <p>对比对象：你的方案 vs 网上代表性公开方案（E谷方案、IIETA算法、2022 X题）。</p>
+  <table>
+    <tr><th>维度</th><th>你的方案（当前实现）</th><th>E谷方案（B站，已查证标题/简介）</th><th>IIETA 翻转周期法（论文，已查证全文）</th><th>2022 X题（历史同源，已查证）</th></tr>
+    <tr>
+      <td>系统架构</td>
+      <td>F407+FreeRTOS + AD9959（GPIO模拟时序）+ K230 MicroPython 视觉 + PC OpenCV 原型</td>
+      <td>STM32 + 单片机DAC 与 AD9834 DDS 叠加输出 + 上位机视觉（"全开源带上位机"）</td>
+      <td>相机 + MATLAB/LabVIEW 离线分析（无实时闭环）</td>
+      <td>CD4046 PLL + 74HC161 倍频 + 模拟滤波 + 数字电位器AGC（纯模拟、禁DSP）</td>
+    </tr>
+    <tr>
+      <td>100Hz 步进 991 频点覆盖</td>
+      <td><span class="tag t-bad">✗ K230 只支持10kHz步进</span></td>
+      <td><span class="tag t-warn">未公开具体频点策略</span>（视觉直接测频思路可覆盖任意频点）</td>
+      <td><span class="tag t-ok">✓ 原理上覆盖任意频点</span>（测的是频差而非频点表）</td>
+      <td><span class="tag t-gray">不适用（1.5~2kHz 窄带）</span></td>
+    </tr>
+    <tr>
+      <td>10s 控制时间</td>
+      <td><span class="tag t-bad">✗ 192点×30ms 预算不可行</span></td>
+      <td><span class="tag t-warn">未公开实测数值</span>；但"视觉直接测频"免去全扫，预算结构合理</td>
+      <td><span class="tag t-ok">✓ 单点测频差</span>，天然不依赖全扫</td>
+      <td><span class="tag t-gray">不适用</span></td>
+    </tr>
+    <tr>
+      <td>5s 稳定性（独立时钟漂移）</td>
+      <td><span class="tag t-warn">规格已写（频率微调+相位爬山），未落地</span></td>
+      <td><span class="tag t-warn">未公开</span></td>
+      <td><span class="tag t-ok">✓ 理论支持持续修正</span>（旋转周期实时测量）</td>
+      <td><span class="tag t-gray">无断开要求</span></td>
+    </tr>
+    <tr>
+      <td>0.2div 幅度精度</td>
+      <td><span class="tag t-ok">✓ 有线要求2~4 已实现PI</span>；要求5幅度环规格已写</td>
+      <td><span class="tag t-warn">未公开div误差</span></td>
+      <td><span class="tag t-warn">测频为主，幅度未涉</span></td>
+      <td><span class="tag t-ok">✓ 幅度≤0.1V（AGC）</span></td>
+    </tr>
+    <tr>
+      <td>实现难度/调试风险</td>
+      <td><span class="tag t-bad">高：三端 + 41.1%识别率 + 预算紧</span></td>
+      <td><span class="tag t-warn">中：信号链更轻（AD9834+DAC），视觉放上位机</span></td>
+      <td><span class="tag t-warn">中：算法本身轻（数阈值像素），需自行移植</span></td>
+      <td><span class="tag t-bad">高：纯模拟调试难度大</span>（当年二等奖，扣分20+）</td>
+    </tr>
+    <tr>
+      <td>成本</td>
+      <td>AD9959（约100~200元）+ K230 + F407 成品板</td>
+      <td>AD9834（约30~50元）+ STM32 最小系统 + 上位机（无需K230）</td>
+      <td>相机 + 电脑</td>
+      <td>CD4046/74HC161 等模拟件（极低）</td>
+    </tr>
+    <tr>
+      <td>可复现性</td>
+      <td>代码在你手里（但K230端实现与规格矛盾）</td>
+      <td><span class="tag t-warn">自称全开源带上位机，但仓库URL未拿到</span>（需手动去B站简介区取）</td>
+      <td><span class="tag t-warn">论文无开源代码，需自行实现（公式明确）</span></td>
+      <td><span class="tag t-ok">✓ B站评论区开源电路细节</span></td>
+    </tr>
+    <tr>
+      <td>整体评价</td>
+      <td><b>架构方向正确、硬件不落后，但视觉观测算法选错 + K230实现与规格矛盾</b></td>
+      <td><b>当前最成体系的公开参照，轻量+上位机分工值得直接对标</b></td>
+      <td><b>你方案"观测算法"这一环的最优解，可立即移植</b></td>
+      <td>有线模拟兜底参照，不适用于要求5</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ================= 结论 ================= -->
+<div class="card" id="s7">
+  <h2>七、结论：有没有更优方案？</h2>
+  <div class="kpi">
+    <div><span class="num">0</span><span class="lbl">可整体替换你的完整开源成品（GitHub/oshwhub/Gitee 检索实证）</span></div>
+    <div><span class="num">1</span><span class="lbl">成体系的公开解法（E谷三集，自称全开源带上位机）</span></div>
+    <div><span class="num">3</span><span class="lbl">已查证的可直接借鉴件（翻转周期法/椭圆拟合/AD9959 HAL驱动）</span></div>
+    <div><span class="num">12s</span><span class="lbl">抖音队伍实测视觉锁频锁相时长（10s预算边上可行）</span></div>
+  </div>
+
+  <h3>7.1 明确回答你的问题</h3>
+  <div class="verdict blue">
+    <b>① 有没有比你的方案更优秀的方案？</b> —— <b>有，但不在"成品"层面，而在"方法"层面。</b>网上没有能直接替换你的完整代码，但存在明显更优的<u>技术路线组合</u>：
+    <ul style="margin-top:6px;">
+      <li><b>E谷路线</b>（已查证）：信号链更轻（STM32 DAC + AD9834 DDS 叠加，替代 AD9959 GPIO 模拟时序）+ <b>视觉算力放上位机</b>（"全开源带上位机"），直接对标你的 K230 端压力问题；视觉侧专开一集《视觉频率检测方案》解决断开后测频。</li>
+      <li><b>翻转周期法</b>（IIETA 论文，已查证全文）：把"单帧波峰计数"换成"连续帧归一化面积曲线 + 旋转周期"，MicroPython 可跑、对 ∞ 形也成立、且直接输出带符号频差——<b>这是对你 41.1% 识别率和 192 点扫频预算两个死点的最优解药</b>。</li>
+      <li>12 秒锁频锁相（抖音实证，已查证）：证明"纯视觉 + 10s 预算"在赛场上真的能跑。</li>
+    </ul>
+  </div>
+
+  <h3>7.2 你的方案到底"死"在哪（一句话）</h3>
+  <div class="verdict red">
+    不是死在硬件（AD9959 很好）、不是死在有线要求2~4（已实现）、也不是死在整体思路（视觉PLL方向对），而是死在<b>K230 端的实现与题目规格自相矛盾（10kHz步进 vs 100Hz步进）+ 观测算法选错（切点数法在旋转图形上失效）+ 全扫式搜索策略在 10s 预算下不可行</b>。这三处都有网上证据或理论依据支撑。
+  </div>
+
+  <h3>7.3 诚实披露的检索边界</h3>
+  <ul>
+    <li><b>未找到</b>：任何队伍公开的 2026 F题完整开源仓库、赛后复盘长文、"100Hz步进991频点vs 10s"矛盾的公开讨论、英文社区讨论（本题为中国国赛题）——2026年8月刚完赛，资料尚未沉淀。</li>
+    <li><b>未能读取</b>：E谷三集简介区的开源仓库 URL（B站简介动态渲染，检索工具读不到，需你手动打开简介复制）。</li>
+    <li><b>一方说法</b>（仅搜索摘要）：部分获奖视频细节、椭圆拟合精度指标等，已逐条标注。</li>
+  </ul>
+</div>
+
+<!-- ================= 改造路线 ================= -->
+<div class="card" id="s8">
+  <h2>八、可执行改造路线（分阶段）</h2>
+  <p>前提：保留你已跑通的有线部分（要求2~4 PI 控制、AD9959 驱动、协议栈）不动，只改"要求5"这条链路。按 5 个阶段推进，每阶段独立可验收。</p>
+
+  <h3>阶段 0（半天）：取料</h3>
+  <ul>
+    <li>手动打开 B站 <code>BV1uF3k6YExu</code> / <code>BV1mL3x67EAU</code> / <code>BV1ekGF6oEec</code> 三个视频简介区，复制 E谷开源仓库链接（kdocs/网盘/gitee）；加入其公众号/评论区索要仓库。</li>
+    <li>读 IIETA 论文全文：<span class="src"><a href="https://iieta.org/journals/ts/paper/10.18280/ts.400312">iieta.org/journals/ts/paper/10.18280/ts.400312</a></span>（公式：Δf = 1/(m·T)）。</li>
+    <li>评估是否换 AD9959 HAL 驱动：<span class="src"><a href="https://github.com/Silver-Ray/AD9959_HAL_DRIVER">github.com/Silver-Ray/AD9959_HAL_DRIVER</a></span>（同芯片，可逆操作，先备份现驱动）。</li>
+  </ul>
+
+  <h3>阶段 1（1~2天）：K230 观测算法换成"翻转周期法"——解死点②</h3>
+  <div class="flow">
+    <b>做法</b>：固定 Y 轴输出频率 f<sub>y</sub>（先粗猜），K230 每帧只做两件事：① 阈值化取黄色轨迹；② 统计 ROI 内亮区像素总数（或分 8×8 子块统计）→ 得到"归一化面积-时间"序列。<br>
+    <b>判读</b>：面积曲线的负峰间隔 = 图形翻转周期 T；频差 Δf = 1/(m·T)，m 由图形类型定（先粗判 1:1 椭圆包络 或 2:1 ∞ 包络，宽容差即可）。<b>旋转方向 = 频差正负</b>。<br>
+    <b>验收</b>：PC 端用你的 OpenCV 原型先复现（你的 PC 代码库里已有 HSV 分割和帧处理），再移植 K230。目标：同一探测点能给出带符号频差，替代"37°双相位确认 + 第二探测点交叉确认"的试探逻辑。
+  </div>
+
+  <h3>阶段 2（2~3天）：搜索策略改"包络粗分类 + 旋转速率闭环"——解死点①③</h3>
+  <div class="flow">
+    <b>粗扫</b>：按包络形状做宽容差分类（1:1 椭圆包络 vs 2:1 ∞ 包络），步长放到 1~2kHz（约 50~100 点 × ~20ms ≈ 1~2s），把 192 点预算省给精锁。<br>
+    <b>精锁</b>：进入粗段后，用阶段1的翻转周期直接算出频差 Δf，<b>一次性比例修正 DDS 频率</b>（不是逐 100Hz 步进盲走），迭代 2~3 轮收敛到图形"静止"（翻转周期 &gt; 观察窗）。<br>
+    <b>验收</b>：对 10.1k/20.1k/90.1k（唐老师提到的测试频点）各测 10 次，记录粗扫+精锁总时间，目标 ≤ 4s 内图形不再旋转。
+  </div>
+
+  <h3>阶段 3（2~3天）：判型与判相用"椭圆拟合 + 对称评分"</h3>
+  <div class="flow">
+    <b>1:1 图形</b>：对二值化轨迹做最小二乘椭圆拟合（5 个未知数，K230 MicroPython 手撸线性方程可行；先在 PC 原型验证）。长短轴比 → 幅度等值判据 + 相位；圆 = a/b≈1 且 φ≈90°。<br>
+    <b>2:1 ∞ 形</b>：保留你规格 md 第8.3节的 E_inf（中心交叉距离 + 左右/上下镜像 IoU + 波瓣面积差），这是 2:1 相位闭环的正解（网上 E7 椭圆拟合法对 ∞ 不适用，但翻转周期法对 m=2 成立）。<br>
+    <b>幅度闭环</b>：沿用你规格 md 第10节（|span_y - span_x| ≤ 0.12div 内部门限，给 0.2div 留余量）。
+  </div>
+
+  <h3>阶段 4（1~2天）：锁定后的持续稳定——解死点④</h3>
+  <div class="flow">
+    沿用你规格 md 第9.3/9.4 节（已写对）：相位斜率 → 频率微调（±2Hz/次，总限幅 ±40Hz）；HOLD 中 ±1~2° 相位爬山，每秒累计 ≤ 20°。补充可选增强：IDC 式"短时微扰频率定时锁定"（~1.5°）精锁相位。
+  </div>
+
+  <h3>阶段 5（备选，若 K230 性能仍不够）：视觉算力上移 PC 上位机</h3>
+  <div class="flow">
+    你的 PC OpenCV 原型（透视校正 8×8 网格 + 三分类 + Chamfer 匹配）已经比 K230 MicroPython 完整得多——这正是 E谷"带上位机"的分工思路。若 10s 预算仍紧张，把视觉闭环放 PC（USB 摄像头拍屏幕 + 串口控 F407），K230 降级为备份。比赛允许用 PC 作为装置一部分（题目未禁止，且 E谷明示"带上位机"）。
+  </div>
+
+  <div class="verdict amber">
+    <b>保守做法提示</b>：以上任何阶段都不要动你已通过验收的有线部分。若时间只够做一件事，先做 <b>阶段1</b>（观测算法换翻转周期法）——它同时缓解识别率、扫频预算、∞形适配三个问题。
+  </div>
+</div>
+
+<!-- ================= 风险与合规 ================= -->
+<div class="card" id="s9">
+  <h2>九、风险与合规提示</h2>
+  <table>
+    <tr><th>事项</th><th>说明</th><th>建议</th></tr>
+    <tr>
+      <td>E谷"全开源"未验证到仓库本体</td>
+      <td>视频标题自称全开源带上位机，但仓库 URL 本次检索未取得（B站简介动态渲染）</td>
+      <td>手动去 B站简介区/公众号取；取到后先核对是否真的包含视觉频率检测闭环代码，再决定借鉴深度</td>
+    </tr>
+    <tr>
+      <td>示波器 USB/LAN/SCPI 读值</td>
+      <td>技术上成熟（scopebench-mcp 等），但题目"挡板遮挡 + 关闭测量窗口 + 强制摄像头"的设计意图就是封闭数据通道</td>
+      <td><b>不要作为方案</b>；如有疑问可赛前向组委会书面确认，但默认按违规处理</td>
+    </tr>
+    <tr>
+      <td>预存频率表 / 装置与信号源通信</td>
+      <td>题目明令禁止（"频率点不得预存在装置中"、"不得有任何电气耦合"）</td>
+      <td>绝对不要碰</td>
+    </tr>
+    <tr>
+      <td>时间窗风险</td>
+      <td>2026 电赛 8 月初完赛，获奖队伍通常赛后 1~3 个月放源码；当前 F题开源空白是时间问题而非没有方案</td>
+      <td>建议 11~12 月用 <code>site:github.com 2026 李萨如</code>、<code>oshwhub 李萨如</code>、<code>"李萨如" site:blog.csdn.net 2026</code> 等关键词复搜一次</td>
+    </tr>
+    <tr>
+      <td>B站/抖音信息等级</td>
+      <td>除已标注"已查证"的视频页/简介/评论外，部分播放量、得分自述（"满分""省一"）为作者单方说法，无法独立核实</td>
+      <td>引用时区分对待；决策以"已查证"来源为主</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ================= 来源清单 ================= -->
+<div class="card" id="s10">
+  <h2>十、来源清单（按查证等级）</h2>
+  <h3>已查证（实际打开读过页面/全文）</h3>
+  <ul>
+    <li>官方赛题公示：<span class="src"><a href="https://res.nuedc-training.com.cn/topic/2026/topic_from_31.html">res.nuedc-training.com.cn/topic/2026/topic_from_31.html</a></span></li>
+    <li>福建赛区赛题页：<span class="src"><a href="https://fjuedc.fzu.edu.cn/info/1013/1243.htm">fjuedc.fzu.edu.cn/info/1013/1243.htm</a></span></li>
+    <li>EET 题目汇总：<span class="src"><a href="https://www.eet-china.com/mp/a513478.html">eet-china.com/mp/a513478.html</a></span></li>
+    <li>E谷三集视频页：<span class="src"><a href="https://www.bilibili.com/video/BV1uF3k6YExu/">BV1uF3k6YExu</a> · <a href="https://www.bilibili.com/video/BV1mL3x67EAU/">BV1mL3x67EAU</a> · <a href="https://www.bilibili.com/video/BV1ekGF6oEec/">BV1ekGF6oEec</a></span></li>
+    <li>山东省一（排名第一）：<span class="src"><a href="https://www.bilibili.com/video/BV17kp16DEAK/">BV17kp16DEAK</a></span>；满分拿下（QQ售卖）：<span class="src"><a href="https://www.bilibili.com/video/BV1TDGT6vE9T/">BV1TDGT6vE9T</a></span>；第五问视觉：<span class="src"><a href="https://www.bilibili.com/video/BV1E9bf6GEkd/">BV1E9bf6GEkd</a></span>；唐老师分析：<span class="src"><a href="https://www.bilibili.com/video/BV1n1uy6XELD/">BV1n1uy6XELD</a></span></li>
+    <li>2022 X题开源讲解：<span class="src"><a href="https://www.bilibili.com/video/BV1oG411G7Hq/">BV1oG411G7Hq</a></span></li>
+    <li>2022 X题题目分析（腾讯转载）：<span class="src"><a href="https://view.inews.qq.com/a/20220908A011Q300">view.inews.qq.com/a/20220908A011Q300</a></span>；夺冠报道：<span class="src"><a href="https://www.eeworld.com.cn/mndz/hisic621366.html">eeworld.com.cn/mndz/hisic621366.html</a></span></li>
+    <li>抖音 12秒锁频锁相：<span class="src"><a href="https://www.iesdouyin.com/share/video/7671648966278684858">7671648966278684858</a></span>；抖动卡0.2div：<span class="src"><a href="https://www.iesdouyin.com/share/video/7668190167618061226">7668190167618061226</a></span>；晶振漂移：<span class="src"><a href="https://www.iesdouyin.com/share/video/7668899806928999598">7668899806928999598</a></span></li>
+    <li>IIETA 翻转周期测频论文：<span class="src"><a href="https://iieta.org/journals/ts/paper/10.18280/ts.400312">iieta.org/journals/ts/paper/10.18280/ts.400312</a></span>（全文精读，PDF 直链 fid/100034）</li>
+    <li>哈工大切点数法讲义：<span class="src"><a href="https://elcap.hit.edu.cn/_upload/article/files/72/be/086e12d94921a6875516f06450f3/ab5bd527-2c09-4b51-a149-73ce6abc41c4.pdf">elcap.hit.edu.cn（PDF）</a></span></li>
+    <li>IDC AD9850 双DDS 李萨如硬件：<span class="src"><a href="https://www.idc-online.com/technical_references/pdfs/electronic_engineering/Hardware_of_Lissajous_Curves.pdf">idc-online.com（PDF）</a></span></li>
+    <li>GitHub：Silver-Ray/AD9959_HAL_DRIVER（28★）、chuxuezhe766/K230（108★）；GitHub 搜索零命中页（李萨如 电赛 / 2026 李萨 / 电赛 2026）；oshwhub 搜索"李萨如"（0工程）</li>
+    <li>element14 ESP32 李萨如信号源：<span class="src"><a href="https://community.element14.com/challenges-projects/project14/spring-clean/b/spring-clean-projects-2026/posts/building-a-standalone-esp32-signal-generator">community.element14.com</a></span></li>
+    <li>CSDN STM32双DAC李萨如：<span class="src"><a href="https://blog.csdn.net/co_worker/article/details/149842118">blog.csdn.net/co_worker/article/details/149842118</a></span></li>
+  </ul>
+  <h3>一方说法（仅搜索摘要 / 作者单方声明，未逐字核实）</h3>
+  <ul>
+    <li>西电校赛 2024 A题 李沙育图形发生系统：<span class="src"><a href="https://edc.xidian.edu.cn/html/notices/20240428/201.html">edc.xidian.edu.cn</a></span></li>
+    <li>物理学报 LOF 椭圆拟合（相位误差 1e-4 rad 等指标为摘要级）：<span class="src"><a href="https://wulixb.iphy.ac.cn/en/article/pdf/preview/10.7498/aps.71.20220401.pdf">wulixb.iphy.ac.cn</a></span></li>
+    <li>scopebench-mcp（USB 读示波器，仅作合规性讨论记录）：<span class="src"><a href="https://pypi.org/project/scopebench-mcp/">pypi.org/project/scopebench-mcp</a></span></li>
+    <li>Telonic LAN 截图例：<span class="src"><a href="https://telonic.co.uk/programming-example-sds-oscilloscope-screen-image-capture-using-python-over-lan/">telonic.co.uk</a></span></li>
+    <li>SENTINEL-Vision 电赛视觉框架：<span class="src"><a href="https://www.bilibili.com/video/BV1TXb5zLEWc/">BV1TXb5zLEWc</a></span></li>
+    <li>GitHub 零star教学仓库（lissajous 测频实验）、boochow/lissa、cjheath/AD9959 等（平台不符或非本题）</li>
+  </ul>
+  <h3>无法访问 / 未找到（如实记录）</h3>
+  <ul>
+    <li>Gitee 搜索页"李萨如"（link dead）；知乎专栏"2026电赛F题"（站内检索为空）；"100Hz步进991频点vs 10s"公开讨论（未找到）；2026 F题完整开源仓库（未找到）；E谷开源仓库 URL（简介动态渲染，未读到）</li>
+  </ul>
+  <p class="footnote">本报告由 4 份分渠道调研报告（GitHub / 中文博客与论坛 / 视频平台 / 英文与往年题）整合而成，原始报告已归档在同目录下：<code>Lissajous_GitHub调研报告.md</code>、<code>Lissajous_中文博客调研报告.md</code>、<code>Lissajous_视频平台调研报告.md</code>、<code>Lissajous_英文往年题调研报告.md</code>。</p>
+</div>
+
+</div>
+</body>
+</html>

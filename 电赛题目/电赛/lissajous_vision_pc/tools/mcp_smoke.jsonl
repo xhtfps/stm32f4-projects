@@ -1,0 +1,6 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_cameras","arguments":{"max_index":4}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"capture_frame","arguments":{"source":1,"output":"outputs/mcp_capture_latest.jpg"}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"watch_camera","arguments":{"source":1,"frames":10,"grid_mode":"fixed"}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"capture_and_analyze","arguments":{"source":1,"grid_mode":"fixed"}}}

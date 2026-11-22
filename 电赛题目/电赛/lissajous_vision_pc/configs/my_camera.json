@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "grid": {
+    "divisions_x": 8,
+    "divisions_y": 8,
+    "warp_width": 800,
+    "warp_height": 800,
+    "corners_norm": [
+      [
+        0.15962441265583038,
+        0.07515657693147659
+      ],
+      [
+        0.8075117468833923,
+        0.08350730687379837
+      ],
+      [
+        0.7793427109718323,
+        0.8684759736061096
+      ],
+      [
+        0.1752738654613495,
+        0.8475991487503052
+      ]
+    ]
+  },
+  "segmentation": {
+    "h_min": 16,
+    "h_max": 45,
+    "s_min": 13,
+    "v_min": 141,
+    "yellow_dominance_min": 65,
+    "weak_h_padding": 4,
+    "weak_s_min": 8,
+    "weak_v_min": 100,
+    "weak_yellow_dominance_min": 24,
+    "reconstruction_iterations": 24,
+    "weak_close_kernel": 5,
+    "min_component_area": 4,
+    "median_kernel": 3,
+    "gaussian_sigma": 0.8,
+    "illumination_sigma": 21.0,
+    "morphology_open_kernel": 3,
+    "artifact_masks_norm": [
+      [
+        0.465,
+        0.0,
+        0.535,
+        0.075
+      ]
+    ]
+  },
+  "measurement": {
+    "low_percentile": 0.35,
+    "high_percentile": 99.65,
+    "axis_band_norm": 0.08,
+    "min_trace_pixels": 50,
+    "symmetry_dilate_px": 2
+  },
+  "temporal": {
+    "geometry_accumulation_frames": 3,
+    "history_seconds": 6.0,
+    "stable_window_seconds": 0.5,
+    "stable_span_range_div": 0.15,
+    "stable_center_range_div": 0.15,
+    "stable_motion_max": 0.12
+  }
+}

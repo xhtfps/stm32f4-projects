@@ -1,0 +1,22 @@
+{
+  "camera_source": "1",
+  "camera_width": 640,
+  "camera_height": 480,
+  "camera_fps": 60,
+  "vision_config": "configs/my_camera.json",
+  "grid_mode": "fixed",
+  "panel_size": 320,
+  "print_every": 10,
+  "max_frames": 0,
+  "serial_port": "auto",
+  "serial_baudrate": 230400,
+  "ack_timeout_ms": 80,
+  "max_ack_retries": 2,
+  "control_timeout_ms": 60000,
+  "hold_ms": 5000,
+  "settle_frames": 1,
+  "minimum_confidence": 0.8,
+  "target_span_div": 8.0,
+  "span_tolerance_div": 0.2,
+  "verify_frames": 3
+}

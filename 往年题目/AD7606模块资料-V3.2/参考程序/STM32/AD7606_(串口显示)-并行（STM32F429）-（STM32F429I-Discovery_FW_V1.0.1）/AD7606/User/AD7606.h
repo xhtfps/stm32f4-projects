@@ -1,0 +1,34 @@
+#ifndef _AD7606_H
+#define _AD7606_H
+
+#define rst_Set 	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET)
+#define rst_Reset  		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET)
+#define convstB_Set 	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET)
+#define convstB_Reset   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET)
+#define convstA_Set 	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET)
+#define convstA_Reset   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET)
+#define STby_Set 	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET)
+#define STby_Reset 	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET)
+#define OS12_Set 	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET)
+#define OS12_Reset       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET)
+#define OS11_Set 	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET)
+#define OS11_Reset       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET)
+#define OS10_Set 	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_SET)
+#define OS10_Reset       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_RESET)
+
+
+#define frstdata_Set 	  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_2, GPIO_PIN_SET)
+#define frstdata_Reset  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_2, GPIO_PIN_RESET)
+#define busy_Set 	  		HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_SET)
+#define busy_Reset   		HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_RESET)
+#define cs_Set 	  			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_SET)
+#define cs_Reset   			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_RESET)
+#define rd_Set 	  		  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET)
+#define rd_Reset   		  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET)
+
+extern void GPIO_AD7606_Configuration(void);
+extern void AD7606_Init(void);
+extern void AD7606_startconvst(void);
+extern void AD7606_reset(void) ;
+extern void AD7606_read_data(int16_t * DB_data);
+#endif

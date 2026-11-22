@@ -1,0 +1,23 @@
+; Custom scatter file for STM32F407ZG
+; Keep generic RW/ZI in internal SRAM, and reserve absolute-address pools
+; for Os_malloc.c only.
+
+LR_IROM1 0x08000000 0x00100000  {
+  ER_IROM1 0x08000000 0x00100000  {
+    *.o (RESET, +First)
+    *(InRoot$$Sections)
+    .ANY (+RO)
+  }
+
+  RW_IRAM1 0x20000000 0x00020000  {
+    .ANY (+RW +ZI)
+  }
+
+  RW_CCM 0x10000000 0x00010000  {
+    os_malloc.o (.ARM.__AT_0x10000000, .ARM.__AT_0x1000F000)
+  }
+
+  RW_EXTSRAM 0x68000000 0x00100000  {
+    os_malloc.o (.ARM.__AT_0x68000000, .ARM.__AT_0x680F0000)
+  }
+}

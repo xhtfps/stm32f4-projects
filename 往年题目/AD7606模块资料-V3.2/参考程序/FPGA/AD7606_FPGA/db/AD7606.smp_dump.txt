@@ -1,0 +1,18 @@
+
+State Machine - |7606|ad7606:inst|state
+Name state.stop state.data8 state.data7 state.data6 state.data5 state.data4 state.data3 state.data2 state.data1 state.start_read state.con_over state.convert state.start state.reset state.idle 
+state.idle 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+state.reset 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 
+state.start 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 
+state.convert 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 
+state.con_over 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 
+state.start_read 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 
+state.data1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 
+state.data2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 1 
+state.data3 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 
+state.data4 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 
+state.data5 0 0 0 0 1 0 0 0 0 0 0 0 0 0 1 
+state.data6 0 0 0 1 0 0 0 0 0 0 0 0 0 0 1 
+state.data7 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 
+state.data8 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 
+state.stop 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
