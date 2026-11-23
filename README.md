@@ -49,3 +49,11 @@ STM32F407 的工程模板、基地调试程序、外设实践与历年电赛题�
 - 芯片手册等大体积 PDF 不进仓库：手册统一登记在 `notes` 仓的手册索引表，仓内只留链接与版本号。
 - 同源旧仓库 `STM32project`（早期综合工程，仅 2 个源文件版本不同）已归档，等价内容在本仓库 `基地调试程序/` 内。
 - 第三方库、芯片手册版权归原作者，仅作学习参考。
+
+## 大文件去哪了
+
+本仓已做过体积治理：大文件从当前分支移出，但历史提交完整保留，随时可取回。
+
+- **完整台账**：[`notes/offload.json`](https://github.com/xhtfps/notes/blob/main/offload.json)（repo / path / size / base_commit），恢复命令与口径见索引仓 [`SLIM-PLAN.md`](https://github.com/xhtfps/xhtfps/blob/main/SLIM-PLAN.md)。
+
+clone 后发现某个文件不在，按台账里的 `base_commit` 打开 `https://github.com/xhtfps/<repo>/blob/<base_commit>/<path>` 取回即可，不要重复提交进仓。
