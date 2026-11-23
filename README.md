@@ -1,6 +1,43 @@
+<div align="center">
+
 # STM32F4 工程集（STM32F407）
 
-STM32F407 的工程模板、基地调试程序、外设实践与历年电赛题目的统一存放处。所有工程均为 Keil MDK 工程，可直接打开编译（`.o/.d/.crf` 等中间产物与 IDE 缓存不入库）。
+**模板、外设验证、历年赛题放在同一个仓里，clone 下来双击 `uvprojx` 就能编译**
+
+![platform](https://img.shields.io/badge/platform-STM32F407ZGT6-0b5cad?style=flat-square)
+![toolchain](https://img.shields.io/badge/toolchain-Keil%20MDK%205.36%2B-1f6feb?style=flat-square)
+![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+![last commit](https://img.shields.io/github/last-commit/xhtfps/stm32f4-projects?style=flat-square)
+
+[快速开始](#3-快速开始) · [常见问题](#5-常见问题) · [全部仓库索引](https://github.com/xhtfps/xhtfps)
+
+</div>
+
+## 为什么是这样一个仓库
+
+散落在硬盘里的 Keil 工程，麻烦的从来不是写代码，而是半年后打开**不知道该从哪个文件改起**。这里按用途把 F407 的工程切开：`工程模板/` 是新工程的起手式，`基地调试程序/` 是一份逐外设的自检清单，`往年题目/` 只放赛题原文与方案、不掺代码。
+
+## 亮点
+
+- **模板就是起手式**：`_01_App`～`_08_USB` 八层已经分好，复制改名即可开工，不必再从零配时钟与串口重定向。
+- **外设自检清单**：LED / KEY / 串口 / LCD / AD9959 / ADS1256 逐项跑通过，上板先过一遍能排除大部分硬件疑点。
+- **题、码分离**：赛题资料与实现代码分目录存放，引用往届方案时不会把别人的整份工程拷进自己的仓。
+- **可追溯的体积治理**：被移出的大文件在 `notes/offload.json` 留了 `base_commit`，随时可按原路径取回。
+
+## 结构
+
+```mermaid
+flowchart LR
+  subgraph T["工程模板/"]
+    A1["_01_App 业务层"] --> A2["_02_Core 时钟·中断"]
+    A2 --> A3["_03_Drive BSP"]
+    A3 --> A4["_04_FWLib HAL"]
+  end
+  subgraph V["基地调试程序/"]
+    B1["LED·KEY·串口"] --> B2["LCD·AD9959·ADS1256"]
+  end
+  T --> V --> C["往年题目/ · 电赛题目/"]
+```
 
 ## 1. 目录一览
 
@@ -57,3 +94,19 @@ STM32F407 的工程模板、基地调试程序、外设实践与历年电赛题�
 - **完整台账**：[`notes/offload.json`](https://github.com/xhtfps/notes/blob/main/offload.json)（repo / path / size / base_commit），恢复命令与口径见索引仓 [`SLIM-PLAN.md`](https://github.com/xhtfps/xhtfps/blob/main/SLIM-PLAN.md)。
 
 clone 后发现某个文件不在，按台账里的 `base_commit` 打开 `https://github.com/xhtfps/<repo>/blob/<base_commit>/<path>` 取回即可，不要重复提交进仓。
+## 路线图
+
+- [x] 工程模板与外设自检程序整理入库
+- [x] 中间产物、IDE 缓存、芯片手册全部移出，历史可追溯
+- [ ] 把各工程重复的 CMSIS 副本抽到 `bsp-libs`，仓体积再降一档
+- [ ] 补一份「新工程从模板到第一次烧录」的十分钟图文指引
+
+## 参与与反馈
+
+- 遇到问题请走 [Issue 模板](.github/ISSUE_TEMPLATE)：带上板卡型号、Keil 版本、完整编译日志，缺信息的单子只能来回追问。
+- 提 PR 前先读 [CONTRIBUTING.md](CONTRIBUTING.md)；安全问题按 [SECURITY.md](SECURITY.md) 私下反馈。
+- 如果这个仓库帮你省过时间，点个 ⭐ 是最省事的支持。
+
+## 许可证
+
+本仓自写代码以 [MIT](LICENSE) 分发；ST HAL、CMSIS 与芯片手册版权归 ST 及原作者，仅作学习参考。
