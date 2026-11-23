@@ -94,6 +94,17 @@ flowchart LR
 - **完整台账**：[`notes/offload.json`](https://github.com/xhtfps/notes/blob/main/offload.json)（repo / path / size / base_commit），恢复命令与口径见索引仓 [`SLIM-PLAN.md`](https://github.com/xhtfps/xhtfps/blob/main/SLIM-PLAN.md)。
 
 clone 后发现某个文件不在，按台账里的 `base_commit` 打开 `https://github.com/xhtfps/<repo>/blob/<base_commit>/<path>` 取回即可，不要重复提交进仓。
+
+## 大文件去哪了
+
+按 `SLIM-PLAN.md` 的口径做体积治理：以下文件**从 HEAD 移出、历史完整保留**。需要时按 `base_commit` 直链下载，不要重新提交进仓。
+
+| 文件 | 体积 | 取回 |
+| --- | --- | --- |
+| `AD7606_global_asgn_op.abo` | 5.2 MB | [blob@a1d2146](https://github.com/xhtfps/stm32f4-projects/blob/a1d2146e421fb882b2ab7e3c3be14e31d942cdae/%E5%BE%80%E5%B9%B4%E9%A2%98%E7%9B%AE/AD7606%E6%A8%A1%E5%9D%97%E8%B5%84%E6%96%99-V3.2/%E5%8F%82%E8%80%83%E7%A8%8B%E5%BA%8F/FPGA/AD7606_FPGA/db/AD7606_global_asgn_op.abo) |
+
+完整台账见 [`notes/offload.json`](https://github.com/xhtfps/notes/blob/main/offload.json)，恢复命令 `python tools/fetch-assets.py --repo stm32f4-projects`。
+
 ## 路线图
 
 - [x] 工程模板与外设自检程序整理入库
